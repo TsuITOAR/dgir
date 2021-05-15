@@ -87,6 +87,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "dgir"
+version = "0.1.0"
+dependencies = [
+ "gds21",
+ "ndarray",
+ "uom",
+]
+
+[[package]]
 name = "dtoa"
 version = "0.4.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -127,15 +136,6 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "toml",
-]
-
-[[package]]
-name = "gust"
-version = "0.1.0"
-dependencies = [
- "gds21",
- "ndarray",
- "uom",
 ]
 
 [[package]]
