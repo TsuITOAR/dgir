@@ -6,7 +6,7 @@ use std::{
 
 use num::Num;
 
-pub trait Unit<S: Num> {
+pub trait Unit<S: Num>: Copy {
     const CONVERSION_FACTOR: S;
 }
 #[derive(Clone, Debug)]
@@ -35,7 +35,7 @@ impl<U: Unit<f64>> Length<U, f64> {
         }
     }
 }
-impl<U: Unit<V> + Clone, V: Num + Copy> Copy for Length<U, V> {}
+impl<U: Unit<V>, V: Num + Copy> Copy for Length<U, V> {}
 
 impl<U: Unit<f64>, V: Unit<f64>> Add<Length<V>> for Length<U, f64> {
     type Output = Length<U>;
