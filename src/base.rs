@@ -121,13 +121,13 @@ impl Circle<f64> {
             Resolution::MinNumber(n) => n,
         };
 
-        let ang_step: f64 = two_pi / num::ToPrimitive::to_f64(&(points_num - 1)).unwrap();
+        let ang_step: f64 = two_pi / num::ToPrimitive::to_f64(&points_num).unwrap();
         let ang_iter = successors(Some(0.), |x| Some(x + ang_step))
-            .take(points_num - 1)
+            .take(points_num)
             .chain(std::iter::once(0.));
 
         let point_list = ang_iter
-            .map(|arg| [center.0 + radius * arg.cos(), center.1 + radius * arg.sin()])
+            .map(|ang| [center.0 + radius * ang.cos(), center.1 + radius * ang.sin()])
             .collect();
         Self { xy: point_list }
     }
