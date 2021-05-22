@@ -79,25 +79,25 @@ impl<U: Unit<f64>, V: Unit<f64>> PartialOrd<Length<V>> for Length<U, f64> {
         self.value.partial_cmp(&other.value)
     }
 }
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct Nanometer;
 impl Unit<f64> for Nanometer {
     const CONVERSION_FACTOR: f64 = 1e-3;
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct Micrometer;
 impl Unit<f64> for Micrometer {
     const CONVERSION_FACTOR: f64 = 1e0;
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct Millimeter;
 impl Unit<f64> for Millimeter {
     const CONVERSION_FACTOR: f64 = 1e3;
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct Centimeter;
 impl Unit<f64> for Centimeter {
     const CONVERSION_FACTOR: f64 = 1e4;
