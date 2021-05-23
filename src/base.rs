@@ -1,7 +1,7 @@
-#![allow(unused_variables)]
-#![allow(dead_code)]
-use std::{convert::TryInto, iter::successors};
+use num::{traits::FloatConst, Float, FromPrimitive, ToPrimitive, Zero};
 
+use crate::units::{Length, Unit};
+use std::{convert::TryInto, iter::successors};
 const MAX_POINTS_NUM: usize = 8191;
 trait Attachable: Sized {
     fn attach<E: Extendable>(self, e: &mut E) -> &mut E {
@@ -78,14 +78,14 @@ impl TryInto<gds21::GdsBoundary> for Polygon<f64> {
     }
 }
 
-pub trait Curve: Sized {
-    fn points_iter(self) -> Box<dyn Iterator<Item = [f64; 2]>>;
-    fn connect_line<T: Curve>(self, other: T) -> Box<dyn Iterator<Item = [f64; 2]>> {
+pub trait Curve<T: Float>: Sized {
+    fn points_iter(self) -> Box<dyn Iterator<Item = [T; 2]>>;
+    fn connect_line<U: Curve<T>>(self, other: U) -> Box<dyn Iterator<Item = [T; 2]>> {
         Box::new(self.points_iter().chain(other.points_iter()))
     }
 }
 
-pub trait ClosedCurve: Curve {}
+pub trait ClosedCurve<T>: Curve<T> {}
 
 pub trait HasWidth {
     fn width(&self) -> f64;
@@ -111,20 +111,26 @@ pub enum Resolution<T> {
 pub struct Circle<T> {
     xy: Vec<[T; 2]>,
 }
-impl Circle<f64> {
-    pub fn new(center: (f64, f64), radius: f64, resolution: Resolution<f64>) -> Self {
-        let two_pi = 2. * std::f64::consts::PI;
-        let points_num = match resolution {
-            Resolution::MinDistance(d) => {
-                num::ToPrimitive::to_usize(&(radius / d * two_pi)).unwrap()
-            }
+impl<U, S> Circle<Length<U, S>>
+where
+    U: Unit<S>,
+    S: Float + FloatConst + ToPrimitive + FromPrimitive,
+{
+    pub fn new(
+        center: (Length<U, S>, Length<U, S>),
+        radius: Length<U, S>,
+        resolution: Resolution<Length<U, S>>,
+    ) -> Self {
+        let two_pi = <S as FloatConst>::PI() + <S as FloatConst>::PI();
+        let points_num: usize = match resolution {
+            Resolution::MinDistance(d) => (radius / d * two_pi).to_usize().unwrap(),
             Resolution::MinNumber(n) => n,
         };
 
-        let ang_step: f64 = two_pi / num::ToPrimitive::to_f64(&points_num).unwrap();
-        let ang_iter = successors(Some(0.), |x| Some(x + ang_step))
+        let ang_step = two_pi / <S as FromPrimitive>::from_usize(points_num).unwrap();
+        let ang_iter = successors(Some(<S as Zero>::zero()), |x| Some(*x + ang_step))
             .take(points_num)
-            .chain(std::iter::once(0.));
+            .chain(std::iter::once(<S as Zero>::zero()));
 
         let point_list = ang_iter
             .map(|ang| [center.0 + radius * ang.cos(), center.1 + radius * ang.sin()])
@@ -133,9 +139,18 @@ impl Circle<f64> {
     }
 }
 
-impl Curve for Circle<f64> {
-    fn points_iter(self) -> Box<dyn Iterator<Item = [f64; 2]>> {
+impl<U, S> Curve<S> for Circle<Length<U, S>>
+where
+    U: Unit<S>,
+    S: Float + FloatConst + ToPrimitive + FromPrimitive,
+{
+    fn points_iter(self) -> Box<dyn Iterator<Item = [Length<U, S>; 2]>> {
         Box::new(self.xy.into_iter())
     }
 }
-impl ClosedCurve for Circle<f64> {}
+impl<U, S> ClosedCurve<S> for Circle<Length<U, S>>
+where
+    U: Unit<S>,
+    S: Float + FloatConst + ToPrimitive + FromPrimitive,
+{
+}

@@ -1,4 +1,5 @@
 mod base;
+mod units;
 use std::convert::TryInto;
 
 use base::{Circle, LayerData, Polygon, Resolution::*};

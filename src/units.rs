@@ -15,21 +15,21 @@ pub struct Length<U: Unit<S>, S: Num = f64> {
     units: PhantomData<U>,
 }
 
-impl<U: Unit<f64>> Length<U, f64> {
-    fn new(value: f64) -> Self {
+impl<U: Unit<S>, S: Num> Length<U, S> {
+    fn new(value: S) -> Self {
         Self {
-            value: value * <U as Unit<f64>>::CONVERSION_FACTOR,
+            value: value * <U as Unit<S>>::CONVERSION_FACTOR,
             units: PhantomData,
         }
     }
-    fn conversion<V: Unit<f64>>(self) -> Length<V, f64> {
-        Length::<V, f64> {
+    fn conversion<V: Unit<S>>(self) -> Length<V, S> {
+        Length::<V, S> {
             value: self.value,
             units: PhantomData,
         }
     }
-    fn set_unit<V: Unit<f64>>(self, _unit: V) -> Length<V, f64> {
-        Length::<V, f64> {
+    fn set_unit<V: Unit<S>>(self, _unit: V) -> Length<V, S> {
+        Length::<V, S> {
             value: self.value,
             units: PhantomData,
         }
@@ -37,45 +37,45 @@ impl<U: Unit<f64>> Length<U, f64> {
 }
 impl<U: Unit<V>, V: Num + Copy> Copy for Length<U, V> {}
 
-impl<U: Unit<f64>, V: Unit<f64>> Add<Length<V>> for Length<U, f64> {
-    type Output = Length<U>;
-    fn add(mut self, rhs: Length<V>) -> Self::Output {
-        self.value += rhs.value;
+impl<U: Unit<S>, V: Unit<S>, S: Num> Add<Length<V, S>> for Length<U, S> {
+    type Output = Length<U, S>;
+    fn add(mut self, rhs: Length<V, S>) -> Self::Output {
+        self.value = self.value + rhs.value;
         self
     }
 }
 
-impl<U: Unit<f64>, V: Unit<f64>> Sub<Length<V>> for Length<U, f64> {
-    type Output = Length<U>;
-    fn sub(mut self, rhs: Length<V>) -> Self::Output {
-        self.value -= rhs.value;
+impl<U: Unit<S>, V: Unit<S>, S: Num> Sub<Length<V, S>> for Length<U, S> {
+    type Output = Length<U, S>;
+    fn sub(mut self, rhs: Length<V, S>) -> Self::Output {
+        self.value = self.value - rhs.value;
         self
     }
 }
 
-impl<U: Unit<f64>> Mul<f64> for Length<U, f64> {
-    type Output = Length<U>;
-    fn mul(mut self, rhs: f64) -> Self::Output {
-        self.value *= rhs;
+impl<U: Unit<S>, S: Num> Mul<S> for Length<U, S> {
+    type Output = Length<U, S>;
+    fn mul(mut self, rhs: S) -> Self::Output {
+        self.value = self.value * rhs;
         self
     }
 }
 
-impl<U: Unit<f64>, V: Unit<f64>> Div<Length<V>> for Length<U, f64> {
-    type Output = f64;
-    fn div(self, rhs: Length<V>) -> Self::Output {
+impl<U: Unit<S>, V: Unit<S>, S: Num> Div<Length<V, S>> for Length<U, S> {
+    type Output = S;
+    fn div(self, rhs: Length<V, S>) -> Self::Output {
         self.value / rhs.value
     }
 }
 
-impl<U: Unit<f64>, V: Unit<f64>> PartialEq<Length<V>> for Length<U, f64> {
-    fn eq(&self, other: &Length<V>) -> bool {
+impl<U: Unit<S>, V: Unit<S>, S: Num + PartialEq> PartialEq<Length<V, S>> for Length<U, S> {
+    fn eq(&self, other: &Length<V, S>) -> bool {
         self.value == other.value
     }
 }
 
-impl<U: Unit<f64>, V: Unit<f64>> PartialOrd<Length<V>> for Length<U, f64> {
-    fn partial_cmp(&self, other: &Length<V>) -> Option<std::cmp::Ordering> {
+impl<U: Unit<S>, V: Unit<S>, S: Num + PartialOrd> PartialOrd<Length<V, S>> for Length<U, S> {
+    fn partial_cmp(&self, other: &Length<V, S>) -> Option<std::cmp::Ordering> {
         self.value.partial_cmp(&other.value)
     }
 }
