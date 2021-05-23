@@ -3,9 +3,14 @@ mod units;
 use std::convert::TryInto;
 
 use base::{Circle, LayerData, Polygon, Resolution::*};
+use units::*;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let c = Circle::new((0., 0.), 50000., MinNumber(5001));
-    let p: Polygon<f64> = (c, LayerData::new(1, 1)).into();
+    let c = Circle::new(
+        (Length::<Micrometer>::new(0.), Length::<Micrometer>::new(0.)),
+        Length::<Micrometer>::new(50.),
+        MinNumber(5000),
+    );
+    let p: Polygon<Length<Micrometer>> = (c, LayerData::new(1, 1)).into();
     use gds21::*;
     let mut lib = GdsLibrary::new("mylib");
     let mut newcell = GdsStruct::new("mycell");

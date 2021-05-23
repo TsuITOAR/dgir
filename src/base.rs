@@ -1,4 +1,4 @@
-use num::{traits::FloatConst, Float, FromPrimitive, ToPrimitive, Zero};
+use num::{traits::FloatConst, Float, FromPrimitive, Num, ToPrimitive, Zero};
 
 use crate::units::{Length, Unit};
 use std::{convert::TryInto, iter::successors};
@@ -58,7 +58,11 @@ pub struct Polygon<T> {
     layer_data: LayerData,
 }
 
-impl TryInto<gds21::GdsBoundary> for Polygon<f64> {
+impl<U, S> TryInto<gds21::GdsBoundary> for Polygon<Length<U, S>>
+where
+    U: Unit<S>,
+    S: Num + ToPrimitive,
+{
     type Error = Box<dyn std::error::Error>;
     fn try_into(self) -> Result<gds21::GdsBoundary, Self::Error> {
         if self.xy.len() > MAX_POINTS_NUM {
@@ -71,29 +75,30 @@ impl TryInto<gds21::GdsBoundary> for Polygon<f64> {
                 .xy
                 .into_iter()
                 .flatten()
-                .map(|x| num::ToPrimitive::to_i32(&x).unwrap())
+                .map(|x| num::ToPrimitive::to_i32(&x.value).unwrap())
                 .collect(),
             ..Default::default()
         })
     }
 }
 
-pub trait Curve<T: Float>: Sized {
-    fn points_iter(self) -> Box<dyn Iterator<Item = [T; 2]>>;
-    fn connect_line<U: Curve<T>>(self, other: U) -> Box<dyn Iterator<Item = [T; 2]>> {
+pub trait Curve<'a, T: 'a>: Sized {
+    fn points_iter(self) -> Box<dyn Iterator<Item = [T; 2]> + 'a>;
+    fn connect_line<U: Curve<'a, T>>(self, other: U) -> Box<dyn Iterator<Item = [T; 2]> + 'a> {
         Box::new(self.points_iter().chain(other.points_iter()))
     }
 }
 
-pub trait ClosedCurve<T>: Curve<T> {}
+pub trait ClosedCurve<'a, T: 'a>: Curve<'a, T> {}
 
 pub trait HasWidth {
     fn width(&self) -> f64;
 }
 
-impl<T> From<(T, LayerData)> for Polygon<f64>
+impl<'a, T, U> From<(T, LayerData)> for Polygon<U>
 where
-    T: ClosedCurve,
+    T: ClosedCurve<'a, U>,
+    U: 'a,
 {
     fn from(s: (T, LayerData)) -> Self {
         let (line, layer_data) = s;
@@ -139,18 +144,20 @@ where
     }
 }
 
-impl<U, S> Curve<S> for Circle<Length<U, S>>
+impl<'a, U, S> Curve<'a, Length<U, S>> for Circle<Length<U, S>>
 where
     U: Unit<S>,
     S: Float + FloatConst + ToPrimitive + FromPrimitive,
+    Length<U, S>: 'a,
 {
-    fn points_iter(self) -> Box<dyn Iterator<Item = [Length<U, S>; 2]>> {
+    fn points_iter(self) -> Box<dyn Iterator<Item = [Length<U, S>; 2]> + 'a> {
         Box::new(self.xy.into_iter())
     }
 }
-impl<U, S> ClosedCurve<S> for Circle<Length<U, S>>
+impl<'a, U, S> ClosedCurve<'a, Length<U, S>> for Circle<Length<U, S>>
 where
     U: Unit<S>,
     S: Float + FloatConst + ToPrimitive + FromPrimitive,
+    Length<U, S>: 'a,
 {
 }

@@ -16,7 +16,7 @@ pub struct Length<U: Unit<S>, S: Num = f64> {
 }
 
 impl<U: Unit<S>, S: Num> Length<U, S> {
-    fn new(value: S) -> Self {
+    pub fn new(value: S) -> Self {
         Self {
             value: value * <U as Unit<S>>::CONVERSION_FACTOR,
             units: PhantomData,
@@ -111,4 +111,6 @@ fn units_operation() {
     assert_eq!(l1, l2);
     assert_eq!(l3, l2 * 1000.);
     assert_eq!(l3, (l1 + l2) * 500.);
+    assert!(l1 < l3);
+    assert_eq!(l1 / l2, 1.);
 }
