@@ -75,7 +75,7 @@ where
                 .xy
                 .into_iter()
                 .flatten()
-                .map(|x| num::ToPrimitive::to_i32(&x.value).unwrap())
+                .map(|x| num::ToPrimitive::to_i32(&(x.value.to_f64().unwrap() * 1e3)).unwrap())
                 .collect(),
             ..Default::default()
         })
@@ -91,9 +91,9 @@ pub trait Curve<'a, T: 'a>: Sized {
 
 pub trait ClosedCurve<'a, T: 'a>: Curve<'a, T> {}
 
-pub trait HasWidth {
+/* pub trait HasWidth {
     fn width(&self) -> f64;
-}
+} */
 
 impl<'a, T, U> From<(T, LayerData)> for Polygon<U>
 where
