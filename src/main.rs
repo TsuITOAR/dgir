@@ -1,5 +1,7 @@
 mod base;
 mod units;
+mod paint;
+mod album;
 use std::convert::TryInto;
 
 use base::{Circle, LayerData, Polygon, Resolution::*};

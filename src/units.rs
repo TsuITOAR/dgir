@@ -35,7 +35,7 @@ impl<U: Unit<S>, S: Num> Length<U, S> {
         }
     }
 }
-impl<U: Unit<V>, V: Num + Copy> Copy for Length<U, V> {}
+impl<U: Unit<S>, S: Num + Copy> Copy for Length<U, S> {}
 
 impl<U: Unit<S>, V: Unit<S>, S: Num> Add<Length<V, S>> for Length<U, S> {
     type Output = Length<U, S>;
@@ -102,7 +102,6 @@ pub struct Centimeter;
 impl Unit<f64> for Centimeter {
     const CONVERSION_FACTOR: f64 = 1e4;
 }
-
 
 #[test]
 fn units_operation() {

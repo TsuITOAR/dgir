@@ -1,6 +1,9 @@
 use num::{traits::FloatConst, Float, FromPrimitive, Num, ToPrimitive, Zero};
 
-use crate::units::{Length, Unit};
+use crate::{
+    paint::*,
+    units::{Length, Unit},
+};
 use std::{convert::TryInto, iter::successors};
 const MAX_POINTS_NUM: usize = 8191;
 trait Attachable: Sized {
@@ -31,27 +34,17 @@ impl<T: Adapter> Attachable for T {}
 
 /* trait Integrated:Sized{
     fn place()
-} */
+}
 
 pub struct Arrow<P, A> {
     position: (P, P),
     direction: A,
 }
 
-pub struct LayerData {
-    layer: i16,
-    datatype: i16,
-}
-impl LayerData {
-    pub fn new(layer: i16, datatype: i16) -> Self {
-        Self { layer, datatype }
-    }
-}
-
 pub struct Port<P, A, const N: usize> {
     vector_info: Arrow<P, A>,
     port: [(P, LayerData); N],
-}
+} */
 
 pub struct Polygon<T> {
     xy: Vec<[T; 2]>,
@@ -113,7 +106,7 @@ pub enum Resolution<T> {
 }
 
 //TO-DO:make xy an enum composed of coordinates and iterator that return a coordinate
-pub struct Circle<T> {
+/* pub struct Circle<T> {
     xy: Vec<[T; 2]>,
 }
 impl<U, S> Circle<Length<U, S>>
@@ -160,4 +153,4 @@ where
     S: Float + FloatConst + ToPrimitive + FromPrimitive,
     Length<U, S>: 'a,
 {
-}
+} */
