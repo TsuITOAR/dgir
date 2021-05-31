@@ -22,7 +22,7 @@ impl<U: Unit<S>, S: Num> Length<U, S> {
             units: PhantomData,
         }
     }
-    fn conversion<V: Unit<S>>(self) -> Length<V, S> {
+    pub(crate) fn conversion<V: Unit<S>>(self) -> Length<V, S> {
         Length::<V, S> {
             value: self.value,
             units: PhantomData,

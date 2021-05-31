@@ -1,4 +1,4 @@
-use crate::draw::Drawing;
+use crate::draw::{Convert, Drawing};
 
 #[derive(Clone, Copy)]
 pub struct LayerData {
@@ -14,13 +14,22 @@ impl LayerData {
     }
 }
 
-pub struct ColorfulDrawing<T> {
+pub struct ColorDrawing<T> {
     color: LayerData,
     drawing: Drawing<T>,
 }
 
-impl<T> ColorfulDrawing<T> {
+impl<T> ColorDrawing<T> {
     pub fn new(color: LayerData, drawing: Drawing<T>) -> Self {
         Self { color, drawing }
+    }
+}
+
+impl<U, T: Convert<U> + 'static> Convert<ColorDrawing<U>> for ColorDrawing<T> {
+    fn convert(self) -> ColorDrawing<U> {
+        ColorDrawing::<U> {
+            color: self.color,
+            drawing: self.drawing.convert(),
+        }
     }
 }

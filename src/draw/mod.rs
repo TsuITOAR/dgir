@@ -6,6 +6,15 @@ use crate::units::{Length, Unit};
 
 mod elements;
 
+pub trait Convert<T> {
+    fn convert(self) -> T;
+}
+
+impl<U: Unit<S>, V: Unit<S>, S: Num + Copy> Convert<Length<V, S>> for Length<U, S> {
+    fn convert(self) -> Length<V, S> {
+        self.conversion()
+    }
+}
 pub trait Brush:
     Sized
     + Add<Self, Output = Self>
@@ -53,4 +62,19 @@ impl<In: 'static + Copy, Out: 'static> Ruler<In, Out> {
 pub enum Drawing<T> {
     Iter(Box<dyn Iterator<Item = [T; 2]>>),
     Points(Vec<[T; 2]>),
+}
+impl<U, T: Convert<U> + 'static> Convert<[U; 2]> for [T; 2] {
+    fn convert(self) -> [U; 2] {
+        [self[0].convert(), self[1].convert()]
+    }
+}
+impl<U, T: Convert<U> + 'static> Convert<Drawing<U>> for Drawing<T> {
+    fn convert(self) -> Drawing<U> {
+        match self {
+            Drawing::Iter(iter) => Drawing::Iter(Box::new(iter.map(|u| u.convert()))),
+            Drawing::Points(points) => {
+                Drawing::Iter(Box::new(points.into_iter().map(|u| u.convert())))
+            }
+        }
+    }
 }
