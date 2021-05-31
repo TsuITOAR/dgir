@@ -1,4 +1,7 @@
-use std::{ops::{Index, IndexMut}, rc::Rc};
+use std::{
+    ops::{Index, IndexMut},
+    rc::Rc,
+};
 
 use crate::{
     draw::{Brush, Convert},
@@ -9,13 +12,43 @@ struct Path<T: Brush> {
     path: ColorDrawing<T>,
     width: T,
 }
+impl<T: Brush + 'static> Path<T> {
+    pub fn to_painting<U: Brush>(self) -> Painting<U>
+    where
+        T: Convert<U>,
+    {
+        Painting::Path(Path::<U> {
+            path: self.path.convert(),
+            width: self.width.convert(),
+        })
+    }
+}
 
 struct Polygon<T: Brush> {
     polygon: ColorDrawing<T>,
 }
-
+impl<T: Brush + 'static> Polygon<T> {
+    pub fn to_painting<U: Brush>(self) -> Painting<U>
+    where
+        T: Convert<U>,
+    {
+        Painting::Polygon(Polygon::<U> {
+            polygon: self.polygon.convert(),
+        })
+    }
+}
 struct Ref<T: Brush> {
     reference: Rc<Album<T>>,
+}
+impl<T: Brush + 'static> Ref<T> {
+    pub fn to_painting<U: Brush>(self) -> Painting<U>
+    where
+        T: Convert<U>,
+    {
+        Painting::Ref(Ref::<U> {
+            reference: Rc::new(self.reference.convert()),
+        })
+    }
 }
 pub enum Painting<T: Brush> {
     Path(Path<T>),
@@ -70,13 +103,13 @@ impl<T: Brush> Album<T> {
         self
     }
 }
-impl<T:Brush> Index<usize> for Album<T>{
+impl<T: Brush> Index<usize> for Album<T> {
     type Output = Painting<T>;
     fn index(&self, index: usize) -> &Self::Output {
         self.paintings.index(index)
     }
 }
-impl<T:Brush> IndexMut<usize> for Album<T>{
+impl<T: Brush> IndexMut<usize> for Album<T> {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         self.paintings.index_mut(index)
     }
