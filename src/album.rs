@@ -1,5 +1,5 @@
 use std::{
-    ops::{Deref, DerefMut, Index, IndexMut},
+    ops::{Deref, DerefMut},
     rc::Rc,
 };
 
@@ -103,6 +103,7 @@ impl<T: Brush> Album<T> {
         self
     }
 }
+
 impl<T: Brush> Deref for Album<T> {
     type Target = Vec<Painting<T>>;
     fn deref(&self) -> &Self::Target {
