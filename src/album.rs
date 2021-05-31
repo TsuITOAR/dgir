@@ -6,16 +6,17 @@ use std::{
 use crate::{
     draw::{Brush, Convert},
     paint::ColorDrawing,
+    units::{Length, Micrometer},
 };
 
-struct Path<T: Brush> {
-    path: ColorDrawing<T>,
-    width: T,
+pub struct Path<T: Brush> {
+    pub path: ColorDrawing<T>,
+    pub width: T,
 }
 impl<T: Brush + 'static> Path<T> {
     pub fn to_painting<U: Brush>(self) -> Painting<U>
     where
-        T: Convert<U>,
+        T: Clone + Convert<U>,
     {
         Painting::Path(Path::<U> {
             path: self.path.convert(),
@@ -24,39 +25,41 @@ impl<T: Brush + 'static> Path<T> {
     }
 }
 
-struct Polygon<T: Brush> {
-    polygon: ColorDrawing<T>,
+pub struct Polygon<T: Brush> {
+    pub polygon: ColorDrawing<T>,
 }
 impl<T: Brush + 'static> Polygon<T> {
     pub fn to_painting<U: Brush>(self) -> Painting<U>
     where
-        T: Convert<U>,
+        T: Clone + Convert<U>,
     {
         Painting::Polygon(Polygon::<U> {
             polygon: self.polygon.convert(),
         })
     }
 }
-struct Ref<T: Brush> {
+/* struct Ref<T: Brush> {
     reference: Rc<Album<T>>,
 }
+
+impl<T: Brush, U: Brush> AsRef<Ref<U>> for Ref<T> {}
 impl<T: Brush + 'static> Ref<T> {
     pub fn to_painting<U: Brush>(self) -> Painting<U>
     where
-        T: Convert<U>,
+        T: Clone + Convert<U>,
     {
         Painting::Ref(Ref::<U> {
             reference: Rc::new(self.reference.convert()),
         })
     }
-}
+} */
 pub enum Painting<T: Brush> {
     Path(Path<T>),
     Polygon(Polygon<T>),
-    Ref(Ref<T>),
+    /* Ref(Ref<T>), */
 }
 
-impl<T: Brush + Convert<U> + 'static, U: Brush> Convert<Painting<U>> for Painting<T> {
+impl<T: Clone + Brush + Convert<U> + 'static, U: Brush> Convert<Painting<U>> for Painting<T> {
     fn convert(self) -> Painting<U> {
         match self {
             Painting::Path(path) => Painting::Path(Path {
@@ -66,31 +69,22 @@ impl<T: Brush + Convert<U> + 'static, U: Brush> Convert<Painting<U>> for Paintin
             Painting::Polygon(polygon) => Painting::Polygon(Polygon {
                 polygon: polygon.polygon.convert(),
             }),
-            Painting::Ref(r) => Painting::Ref(Ref {
+            /* Painting::Ref(r) => Painting::Ref(Ref {
                 reference: Rc::new(r.reference.convert()),
-            }),
-        }
-    }
-}
-impl<T: Brush + Convert<U> + 'static, U: Brush> Convert<Album<U>> for Album<T> {
-    fn convert(self) -> Album<U> {
-        Album::<U> {
-            name: self.name,
-            //TO-DO:this consumes paintings, break the share between structure, change this to a decorator after the original output
-            paintings: self.paintings.into_iter().map(|x| x.convert()).collect(),
+            }), */
         }
     }
 }
 
-pub struct Album<T: Brush> {
-    name: String,
-    paintings: Vec<Painting<T>>,
+pub struct Album<T: Brush = Length<Micrometer, f64>> {
+    pub name: String,
+    pub(crate) paintings: Vec<Painting<T>>,
 }
 
 impl<T: Brush> Album<T> {
-    pub fn new(name: String) -> Self {
+    pub fn new(name: impl Into<String>) -> Self {
         Self {
-            name,
+            name: name.into(),
             paintings: Vec::new(),
         }
     }
@@ -98,10 +92,7 @@ impl<T: Brush> Album<T> {
         self.name = name;
         self
     }
-    pub fn push<U: Convert<T> + Brush + 'static>(&mut self, painting: Painting<U>) -> &mut Self {
-        self.paintings.push(painting.convert());
-        self
-    }
+
 }
 
 impl<T: Brush> Deref for Album<T> {
@@ -114,5 +105,14 @@ impl<T: Brush> Deref for Album<T> {
 impl<T: Brush> DerefMut for Album<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.paintings
+    }
+}
+impl<T: Clone + Brush + Convert<U> + 'static, U: Brush> Convert<Album<U>> for Album<T> {
+    fn convert(self) -> Album<U> {
+        Album::<U> {
+            name: self.name,
+            //TO-DO:this consumes paintings, break the share between structure, change this to a decorator after the original output
+            paintings: self.paintings.into_iter().map(|x| x.convert()).collect(),
+        }
     }
 }

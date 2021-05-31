@@ -1,8 +1,8 @@
-use std::iter::successors;
+use std::iter::{once, successors};
 
 use num::{traits::FloatConst, Float, FromPrimitive, ToPrimitive, Zero};
 
-use crate::base::Resolution;
+use crate::draw::Resolution;
 
 use super::{Brush, Ruler};
 
@@ -45,7 +45,9 @@ where
             two_pi / <<S as Brush>::Basic as FromPrimitive>::from_usize(step_num).unwrap();
         let list = successors(Some(<Self::In as Zero>::zero()), move |ang| {
             Some(*ang + ang_step)
-        });
+        })
+        .take(step_num)
+        .chain(once(<Self::In as Zero>::zero()));
         let radius = self.radius;
         let center = self.center;
         let x = move |ang: Self::In| center.0 + radius * ang.cos();

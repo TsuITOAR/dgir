@@ -1,24 +1,29 @@
-mod base;
-mod units;
-mod paint;
-mod album;
-use std::convert::TryInto;
+use std::time::Instant;
 
-use base::{Circle, LayerData, Polygon, Resolution::*};
+use dgir::{
+    album::{Album, Painting, Polygon},
+    draw::{self, elements::RulerFactory, Resolution},
+    paint::LayerData,
+    units, Alb, Lib,
+};
 use units::*;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let c = Circle::new(
-        (Length::<Micrometer>::new(0.), Length::<Micrometer>::new(0.)),
-        Length::<Micrometer>::new(50.),
-        MinNumber(5000),
+    let start = Instant::now();
+    let mut lib = Lib::new("first_lib");
+    let mut album = Alb::new("first_alb");
+    let micro = Length::<Micrometer>::new(1.);
+    let layer = LayerData::new(1, 0);
+    let circle = draw::elements::Circle::new(
+        (micro * 0., micro * 0.),
+        micro * 100.,
+        Resolution::MinNumber(5000000),
     );
-    let p: Polygon<Length<Micrometer>> = (c, LayerData::new(1, 1)).into();
-    use gds21::*;
-    let mut lib = GdsLibrary::new("mylib");
-    let mut newcell = GdsStruct::new("mycell");
-    let b = p.try_into().unwrap();
-    newcell.elems.push(GdsElement::GdsBoundary(b));
-    lib.structs.push(newcell);
-    lib.save("example.gds")?;
+    album.push(Painting::Polygon(Polygon {
+        polygon: layer.color(circle.produce().draw()),
+    }));
+    lib.push(album);
+    lib.to_gds(1e-6, 1e-9).save("first_file.gds")?;
+    let duration = start.elapsed();
+    println!("time costed:{}ms", duration.as_millis());
     Ok(())
 }

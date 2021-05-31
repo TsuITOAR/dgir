@@ -103,6 +103,11 @@ impl Unit<f64> for Centimeter {
     const CONVERSION_FACTOR: f64 = 1e4;
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct Meter;
+impl Unit<f64> for Meter {
+    const CONVERSION_FACTOR: f64 = 1e6;
+}
 #[test]
 fn units_operation() {
     let l1 = Length::<Nanometer>::new(1000.);

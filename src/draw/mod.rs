@@ -1,11 +1,18 @@
-use std::ops::{Add, Div, Mul, Sub};
+use std::{
+    iter::once,
+    ops::{Add, Div, Mul, Sub},
+};
 
-use num::Num;
+use num::{Num, ToPrimitive};
 
 use crate::units::{Length, Unit};
 
-mod elements;
+pub mod elements;
 
+pub enum Resolution<T> {
+    MinDistance(T),
+    MinNumber(usize),
+}
 pub trait Convert<T> {
     fn convert(self) -> T;
 }
@@ -22,10 +29,10 @@ pub trait Brush:
     + Mul<Self::Basic, Output = Self>
     + Div<Self, Output = Self::Basic>
 {
-    type Basic: Num + Sized + Copy;
+    type Basic: Num + Sized + Copy + ToPrimitive;
 }
 
-impl<U: Unit<S>, S: Num + Copy> Brush for Length<U, S> {
+impl<U: Unit<S>, S: Num + Copy + ToPrimitive> Brush for Length<U, S> {
     type Basic = S;
 }
 
@@ -63,12 +70,40 @@ pub enum Drawing<T> {
     Iter(Box<dyn Iterator<Item = [T; 2]>>),
     Points(Vec<[T; 2]>),
 }
-impl<U, T: Convert<U> + 'static> Convert<[U; 2]> for [T; 2] {
-    fn convert(self) -> [U; 2] {
-        [self[0].convert(), self[1].convert()]
+impl<T: Brush + Clone> Drawing<T> {
+    pub(crate) fn to_xy<U>(self, database_unit: U) -> Vec<i32>
+    where
+        U: Clone + Convert<T>,
+    {
+        let database_unit = database_unit.convert();
+        match self {
+            Drawing::Iter(iter) => iter
+                .map(|x| {
+                    once((x[0].clone() / database_unit.clone()).to_i32().unwrap()).chain(once(
+                        (x[1].clone() / database_unit.clone()).to_i32().unwrap(),
+                    ))
+                })
+                .flatten()
+                .collect(),
+            Drawing::Points(points) => points
+                .into_iter()
+                .map(|x| {
+                    once((x[0].clone() / database_unit.clone()).to_i32().unwrap()).chain(once(
+                        (x[1].clone() / database_unit.clone()).to_i32().unwrap(),
+                    ))
+                })
+                .flatten()
+                .collect(),
+        }
     }
 }
-impl<U, T: Convert<U> + 'static> Convert<Drawing<U>> for Drawing<T> {
+impl<U, T: Clone + Convert<U> + 'static> Convert<[U; 2]> for [T; 2] {
+    fn convert(self) -> [U; 2] {
+        let mut it = self.into_iter().map(|t| t.clone().convert());
+        [it.next().unwrap(), it.next().unwrap()]
+    }
+}
+impl<U, T: Clone + Convert<U> + 'static> Convert<Drawing<U>> for Drawing<T> {
     fn convert(self) -> Drawing<U> {
         match self {
             Drawing::Iter(iter) => Drawing::Iter(Box::new(iter.map(|u| u.convert()))),

@@ -62,14 +62,6 @@ where
             return Err("too many points in a polygon".into());
         }
         Ok(gds21::GdsBoundary {
-            layer: self.layer_data.layer,
-            datatype: self.layer_data.datatype,
-            xy: self
-                .xy
-                .into_iter()
-                .flatten()
-                .map(|x| num::ToPrimitive::to_i32(&(x.value.to_f64().unwrap() * 1e3)).unwrap())
-                .collect(),
             ..Default::default()
         })
     }
@@ -99,58 +91,3 @@ where
         Self { layer_data, xy }
     }
 }
-
-pub enum Resolution<T> {
-    MinDistance(T),
-    MinNumber(usize),
-}
-
-//TO-DO:make xy an enum composed of coordinates and iterator that return a coordinate
-/* pub struct Circle<T> {
-    xy: Vec<[T; 2]>,
-}
-impl<U, S> Circle<Length<U, S>>
-where
-    U: Unit<S>,
-    S: Float + FloatConst + ToPrimitive + FromPrimitive,
-{
-    pub fn new(
-        center: (Length<U, S>, Length<U, S>),
-        radius: Length<U, S>,
-        resolution: Resolution<Length<U, S>>,
-    ) -> Self {
-        let two_pi = <S as FloatConst>::PI() + <S as FloatConst>::PI();
-        let points_num: usize = match resolution {
-            Resolution::MinDistance(d) => (radius / d * two_pi).to_usize().unwrap(),
-            Resolution::MinNumber(n) => n,
-        };
-
-        let ang_step = two_pi / <S as FromPrimitive>::from_usize(points_num).unwrap();
-        let ang_iter = successors(Some(<S as Zero>::zero()), |x| Some(*x + ang_step))
-            .take(points_num)
-            .chain(std::iter::once(<S as Zero>::zero()));
-
-        let point_list = ang_iter
-            .map(|ang| [center.0 + radius * ang.cos(), center.1 + radius * ang.sin()])
-            .collect();
-        Self { xy: point_list }
-    }
-}
-
-impl<'a, U, S> Curve<'a, Length<U, S>> for Circle<Length<U, S>>
-where
-    U: Unit<S>,
-    S: Float + FloatConst + ToPrimitive + FromPrimitive,
-    Length<U, S>: 'a,
-{
-    fn points_iter(self) -> Box<dyn Iterator<Item = [Length<U, S>; 2]> + 'a> {
-        Box::new(self.xy.into_iter())
-    }
-}
-impl<'a, U, S> ClosedCurve<'a, Length<U, S>> for Circle<Length<U, S>>
-where
-    U: Unit<S>,
-    S: Float + FloatConst + ToPrimitive + FromPrimitive,
-    Length<U, S>: 'a,
-{
-} */

@@ -15,8 +15,8 @@ impl LayerData {
 }
 
 pub struct ColorDrawing<T> {
-    color: LayerData,
-    drawing: Drawing<T>,
+    pub(crate) color: LayerData,
+    pub(crate) drawing: Drawing<T>,
 }
 
 impl<T> ColorDrawing<T> {
@@ -25,7 +25,7 @@ impl<T> ColorDrawing<T> {
     }
 }
 
-impl<U, T: Convert<U> + 'static> Convert<ColorDrawing<U>> for ColorDrawing<T> {
+impl<U, T: Clone + Convert<U> + 'static> Convert<ColorDrawing<U>> for ColorDrawing<T> {
     fn convert(self) -> ColorDrawing<U> {
         ColorDrawing::<U> {
             color: self.color,
