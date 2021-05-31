@@ -1,5 +1,5 @@
 use std::{
-    ops::{Index, IndexMut},
+    ops::{Deref, DerefMut, Index, IndexMut},
     rc::Rc,
 };
 
@@ -103,14 +103,15 @@ impl<T: Brush> Album<T> {
         self
     }
 }
-impl<T: Brush> Index<usize> for Album<T> {
-    type Output = Painting<T>;
-    fn index(&self, index: usize) -> &Self::Output {
-        self.paintings.index(index)
+impl<T: Brush> Deref for Album<T> {
+    type Target = Vec<Painting<T>>;
+    fn deref(&self) -> &Self::Target {
+        &self.paintings
     }
 }
-impl<T: Brush> IndexMut<usize> for Album<T> {
-    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        self.paintings.index_mut(index)
+
+impl<T: Brush> DerefMut for Album<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.paintings
     }
 }
