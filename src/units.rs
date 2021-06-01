@@ -28,12 +28,6 @@ impl<U: Unit<S>, S: Num> Length<U, S> {
             units: PhantomData,
         }
     }
-    fn set_unit<V: Unit<S>>(self, _unit: V) -> Length<V, S> {
-        Length::<V, S> {
-            value: self.value,
-            units: PhantomData,
-        }
-    }
 }
 impl<U: Unit<S>, S: Num + Copy> Copy for Length<U, S> {}
 

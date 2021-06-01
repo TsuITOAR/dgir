@@ -1,7 +1,4 @@
-use std::{
-    iter::once,
-    ops::{Add, Div, Mul, Sub},
-};
+use std::ops::{Add, Div, Mul, Sub};
 
 use crate::units::{Length, Unit};
 use arrayvec::ArrayVec;
@@ -9,6 +6,7 @@ use num::{Num, ToPrimitive};
 
 pub mod elements;
 
+//TO-DO:This actually cost more time for little file, need to figure out
 type Coordinate<T> = ArrayVec<T, 2>;
 pub enum Resolution<T> {
     MinDistance(T),

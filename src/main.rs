@@ -1,7 +1,7 @@
 use std::time::Instant;
 
 use dgir::{
-    album::{Album, Painting, Polygon},
+    album::{Painting, Polygon},
     draw::{self, elements::RulerFactory, Resolution},
     paint::LayerData,
     units, Alb, Lib,
@@ -16,7 +16,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let circle = draw::elements::Circle::new(
         (micro * 0., micro * 0.),
         micro * 100.,
-        Resolution::MinNumber(5000000),
+        Resolution::MinNumber(5000),
     );
     album.push(Painting::Polygon(Polygon {
         polygon: layer.color(circle.produce().draw()),
