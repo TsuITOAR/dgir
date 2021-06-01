@@ -9,3 +9,4 @@ edition = "2018"
 [dependencies]
 gds21 = "*"
 num = "*"
+arrayvec = "*"

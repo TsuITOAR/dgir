@@ -21,9 +21,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     album.push(Painting::Polygon(Polygon {
         polygon: layer.color(circle.produce().draw()),
     }));
+    println!("time costed:{}ms", start.elapsed().as_millis());
     lib.push(album);
     lib.to_gds(1e-6, 1e-9).save("first_file.gds")?;
-    let duration = start.elapsed();
-    println!("time costed:{}ms", duration.as_millis());
+    println!("time costed:{}ms", start.elapsed().as_millis());
     Ok(())
 }

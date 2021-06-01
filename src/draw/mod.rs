@@ -3,12 +3,13 @@ use std::{
     ops::{Add, Div, Mul, Sub},
 };
 
-use num::{Num, ToPrimitive};
-
 use crate::units::{Length, Unit};
+use arrayvec::ArrayVec;
+use num::{Num, ToPrimitive};
 
 pub mod elements;
 
+type Coordinate<T> = ArrayVec<T, 2>;
 pub enum Resolution<T> {
     MinDistance(T),
     MinNumber(usize),
@@ -60,15 +61,17 @@ impl<In: 'static + Copy, Out: 'static> Ruler<In, Out> {
     pub fn draw(self) -> Drawing<Out> {
         let mut x = self.x;
         let mut y = self.y;
-        Drawing::Iter(Box::new(self.list.map(move |p| [x(p), y(p)])))
+        Drawing::Iter(Box::new(
+            self.list.map(move |p| Coordinate::from([x(p), y(p)])),
+        ))
     }
     pub fn decorate(self, decorator: Box<dyn FnMut(In) -> In>) -> Self {
         Self::new(Box::new(self.list.map(decorator)), self.x, self.y)
     }
 }
 pub enum Drawing<T> {
-    Iter(Box<dyn Iterator<Item = [T; 2]>>),
-    Points(Vec<[T; 2]>),
+    Iter(Box<dyn Iterator<Item = Coordinate<T>>>),
+    Points(Vec<Coordinate<T>>),
 }
 impl<T: Brush + Clone> Drawing<T> {
     pub(crate) fn to_xy<U>(self, database_unit: U) -> Vec<i32>
@@ -76,31 +79,16 @@ impl<T: Brush + Clone> Drawing<T> {
         U: Clone + Convert<T>,
     {
         let database_unit = database_unit.convert();
+        let convert = |x: T| (x / database_unit.clone()).to_i32().unwrap();
         match self {
-            Drawing::Iter(iter) => iter
-                .map(|x| {
-                    once((x[0].clone() / database_unit.clone()).to_i32().unwrap()).chain(once(
-                        (x[1].clone() / database_unit.clone()).to_i32().unwrap(),
-                    ))
-                })
-                .flatten()
-                .collect(),
-            Drawing::Points(points) => points
-                .into_iter()
-                .map(|x| {
-                    once((x[0].clone() / database_unit.clone()).to_i32().unwrap()).chain(once(
-                        (x[1].clone() / database_unit.clone()).to_i32().unwrap(),
-                    ))
-                })
-                .flatten()
-                .collect(),
+            Drawing::Iter(iter) => iter.flatten().map(convert).collect(),
+            Drawing::Points(points) => points.into_iter().flatten().map(convert).collect(),
         }
     }
 }
-impl<U, T: Clone + Convert<U> + 'static> Convert<[U; 2]> for [T; 2] {
-    fn convert(self) -> [U; 2] {
-        let mut it = self.into_iter().map(|t| t.clone().convert());
-        [it.next().unwrap(), it.next().unwrap()]
+impl<U, T: Clone + Convert<U> + 'static> Convert<Coordinate<U>> for Coordinate<T> {
+    fn convert(self) -> Coordinate<U> {
+        self.into_iter().map(|x| x.convert()).collect()
     }
 }
 impl<U, T: Clone + Convert<U> + 'static> Convert<Drawing<U>> for Drawing<T> {
