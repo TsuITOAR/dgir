@@ -38,21 +38,12 @@ impl<T: Brush + 'static> Polygon<T> {
         })
     }
 }
-/* struct Ref<T: Brush> {
-    reference: Rc<Album<T>>,
+pub struct Decorator;
+pub struct Ref<'a, T: Brush> {
+    decorator: Decorator,
+    reference: &'a Album<T>,
 }
 
-impl<T: Brush, U: Brush> AsRef<Ref<U>> for Ref<T> {}
-impl<T: Brush + 'static> Ref<T> {
-    pub fn to_painting<U: Brush>(self) -> Painting<U>
-    where
-        T: Clone + Convert<U>,
-    {
-        Painting::Ref(Ref::<U> {
-            reference: Rc::new(self.reference.convert()),
-        })
-    }
-} */
 pub enum Painting<T: Brush> {
     Path(Path<T>),
     Polygon(Polygon<T>),
@@ -92,7 +83,6 @@ impl<T: Brush> Album<T> {
         self.name = name;
         self
     }
-
 }
 
 impl<T: Brush> Deref for Album<T> {

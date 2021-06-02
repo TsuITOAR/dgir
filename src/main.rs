@@ -16,7 +16,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let circle = draw::elements::Circle::new(
         (micro * 0., micro * 0.),
         micro * 100.,
-        Resolution::MinNumber(5000),
+        Resolution::MinNumber(5000000),
     );
     album.push(Painting::Polygon(Polygon {
         polygon: layer.color(circle.produce().draw()),
