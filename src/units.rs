@@ -4,8 +4,7 @@ use std::{
     ops::{Add, Div, Mul, Sub},
 };
 
-use num::{FromPrimitive, Num, Zero};
-
+use num::{traits::FloatConst, Float, FromPrimitive, Num, ToPrimitive, Zero};
 pub trait AbsoluteUnit {
     const CONVERSION_FACTOR: f64;
 }
@@ -154,6 +153,112 @@ impl RelativeUnit for UserUnit {
 
 pub type AbsoluteLength<S> = Length<Absolute, S>;
 pub type RelativeLength<S> = Length<Relative, S>;
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Deg<S>(S);
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Rad<S>(S);
+
+pub trait Angle {
+    type Basic;
+    fn to_rad(self) -> Self::Basic;
+    fn to_deg(self) -> Self::Basic;
+    fn from_rad(rad: Self::Basic) -> Self;
+    fn from_deg(deg: Self::Basic) -> Self;
+}
+
+impl<S> Angle for Deg<S>
+where
+    S: FloatConst + Float + Zero + FromPrimitive + ToPrimitive,
+{
+    type Basic = S;
+    fn to_deg(self) -> Self::Basic {
+        self.0
+    }
+    fn to_rad(self) -> Self::Basic {
+        self.0 / <Self::Basic as FromPrimitive>::from_f64(180.).unwrap()
+            * <Self::Basic as FloatConst>::PI()
+    }
+    fn from_deg(deg: Self::Basic) -> Self {
+        Self(deg)
+    }
+    fn from_rad(rad: Self::Basic) -> Self {
+        Self(
+            rad * <Self::Basic as FromPrimitive>::from_f64(180.).unwrap()
+                / <Self::Basic as FloatConst>::PI(),
+        )
+    }
+}
+
+impl<S> Angle for Rad<S>
+where
+    S: FloatConst + Float + Zero + FromPrimitive + ToPrimitive,
+{
+    type Basic = S;
+    fn to_deg(self) -> Self::Basic {
+        self.0 / <Self::Basic as FloatConst>::PI()
+            * <Self::Basic as FromPrimitive>::from_f64(180.).unwrap()
+    }
+    fn to_rad(self) -> Self::Basic {
+        self.0
+    }
+    fn from_deg(deg: Self::Basic) -> Self {
+        Self(
+            deg * <Self::Basic as FloatConst>::PI()
+                / <Self::Basic as FromPrimitive>::from_f64(180.).unwrap(),
+        )
+    }
+    fn from_rad(rad: Self::Basic) -> Self {
+        Self(rad)
+    }
+}
+
+impl<S> From<Rad<S>> for Deg<S>
+where
+    S: FloatConst + Float + Zero + FromPrimitive + ToPrimitive,
+{
+    fn from(rad: Rad<S>) -> Self {
+        Self(rad.to_deg())
+    }
+}
+
+impl<S> From<Deg<S>> for Rad<S>
+where
+    S: FloatConst + Float + Zero + FromPrimitive + ToPrimitive,
+{
+    fn from(deg: Deg<S>) -> Self {
+        Self(deg.to_rad())
+    }
+}
+
+impl<S: Add<Output = S>, T: Angle<Basic = S>> Add<T> for Rad<S> {
+    type Output = Rad<S>;
+    fn add(self, rhs: T) -> Self::Output {
+        Self(self.0 + rhs.to_rad())
+    }
+}
+
+impl<S: Add<Output = S>, T: Angle<Basic = S>> Add<T> for Deg<S> {
+    type Output = Deg<S>;
+    fn add(self, rhs: T) -> Self::Output {
+        Self(self.0 + rhs.to_deg())
+    }
+}
+
+impl<S: Sub<Output = S>, T: Angle<Basic = S>> Sub<T> for Rad<S> {
+    type Output = Rad<S>;
+    fn sub(self, rhs: T) -> Self::Output {
+        Self(self.0 - rhs.to_rad())
+    }
+}
+
+impl<S: Sub<Output = S>, T: Angle<Basic = S>> Sub<T> for Deg<S> {
+    type Output = Deg<S>;
+    fn sub(self, rhs: T) -> Self::Output {
+        Self(self.0 - rhs.to_deg())
+    }
+}
 
 #[test]
 fn units_operation() {

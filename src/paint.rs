@@ -1,4 +1,4 @@
-use crate::draw::{ Drawing};
+use crate::draw::{Drawing, Ruler};
 
 #[derive(Clone, Copy)]
 pub struct LayerData {
@@ -9,8 +9,8 @@ impl LayerData {
     pub fn new(layer: i16, datatype: i16) -> Self {
         Self { layer, datatype }
     }
-    pub fn color<T>(&self, drawing: Drawing<T>) -> ColorDrawing<T> {
-        ColorDrawing::new(self.clone(), drawing)
+    pub fn color<T>(self, drawing: Drawing<T>) -> ColorDrawing<T> {
+        ColorDrawing::new(self, drawing)
     }
 }
 
@@ -25,3 +25,4 @@ impl<T> ColorDrawing<T> {
     }
 }
 
+impl<In: 'static, Out: 'static> Ruler<In, Out> {}

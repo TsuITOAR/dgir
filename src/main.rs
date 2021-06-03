@@ -17,7 +17,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Resolution::MinNumber(5000),
     );
     cell.push(Painting::Polygon(Polygon {
-        polygon: layer.color(circle.produce().draw()),
+        polygon: circle.produce().draw(),
+        color: layer,
     }));
     println!("time costed:{}ms", start.elapsed().as_millis());
     let mut top_cell = Cell::new("sec_alb");

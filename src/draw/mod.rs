@@ -1,9 +1,6 @@
-use std::{
-    marker::PhantomData,
-    ops::{Add, Div, Mul, Sub},
-};
+use std::ops::{Add, Div, Mul, Sub};
 
-use crate::units::{Absolute, Length, LengthType, Meter};
+use crate::units::{Absolute, Length, Meter};
 use arrayvec::ArrayVec;
 use num::{FromPrimitive, Num, ToPrimitive, Zero};
 

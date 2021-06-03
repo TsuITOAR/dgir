@@ -1,8 +1,14 @@
-use std::iter::{once, successors};
+use std::{
+    iter::{once, successors},
+    ops::Add,
+};
 
 use num::{traits::FloatConst, Float, FromPrimitive, ToPrimitive, Zero};
 
-use crate::draw::Resolution;
+use crate::{
+    draw::Resolution,
+    units::{Angle, Deg},
+};
 
 use super::{Brush, Ruler};
 
@@ -53,5 +59,83 @@ where
         let x = move |ang: Self::In| center.0 + radius * ang.cos();
         let y = move |ang: Self::In| center.1 + radius * ang.sin();
         Ruler::new(list, x, y)
+    }
+}
+
+pub struct Rectangle<S: Copy, A: Angle + Copy = Deg<S>> {
+    point1: (S, S),
+    point2: (S, S),
+    angle: Option<A>,
+}
+
+impl<S: Copy, A: Angle + Copy> Rectangle<S, A> {
+    pub fn from_points(point1: (S, S), point2: (S, S)) -> Self {
+        Self {
+            point1,
+            point2,
+            angle: None,
+        }
+    }
+    pub fn from_lens(x: S, y: S) -> Self
+    where
+        S: FromPrimitive + Float,
+    {
+        Self {
+            point1: (
+                x.neg() / S::from_f64(2.).unwrap(),
+                y.neg() / S::from_f64(2.).unwrap(),
+            ),
+            point2: (x / S::from_f64(2.).unwrap(), y / S::from_f64(2.).unwrap()),
+            angle: None,
+        }
+    }
+    pub fn rotate<U: Into<A>>(&mut self, angle: U)
+    where
+        A: Add<Output = A>,
+    {
+        match self.angle {
+            Some(ref mut a) => *a = a.clone() + angle.into(),
+            None => self.angle = Some(angle.into()),
+        }
+    }
+}
+
+impl<S, A> RulerFactory for Rectangle<S, A>
+where
+    S: 'static + Brush + Copy,
+    <S as Brush>::Basic: FloatConst + Float + ToPrimitive + FromPrimitive,
+    A: 'static + Angle<Basic = <S as Brush>::Basic> + Copy,
+{
+    type In = (S, S);
+    type Out = S;
+    fn produce(self) -> Ruler<Self::In, Self::Out> {
+        let points = vec![
+            (self.point1.0, self.point1.1),
+            (self.point2.0, self.point1.1),
+            (self.point2.0, self.point2.1),
+            (self.point1.0, self.point2.1),
+        ];
+        let (x, y): (
+            Box<dyn FnMut(Self::In) -> Self::Out>,
+            Box<dyn FnMut(Self::In) -> Self::Out>,
+        ) = match self.angle {
+            Some(a) => (
+                Box::new(move |point: (S, S)| {
+                    point.0 * a.to_rad().cos() - point.1 * a.to_rad().sin()
+                }),
+                Box::new(move |point: (S, S)| {
+                    point.0 * a.to_rad().sin() + point.1 * a.to_rad().cos()
+                }),
+            ),
+            None => (
+                Box::new(move |point: (S, S)| point.0),
+                Box::new(move |point: (S, S)| point.1),
+            ),
+        };
+        Ruler {
+            list: Box::new(points.into_iter()),
+            x,
+            y,
+        }
     }
 }

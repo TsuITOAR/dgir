@@ -7,12 +7,13 @@ use std::{
 use num::{FromPrimitive, ToPrimitive};
 
 use crate::{
-    draw::{Brush, Coordinate},
-    paint::ColorDrawing,
+    draw::{Brush, Coordinate, Drawing},
+    paint::LayerData,
 };
 
 pub struct Path<T: Brush> {
-    pub path: ColorDrawing<T>,
+    pub coordinates: Drawing<T>,
+    pub color: LayerData,
     pub width: T,
 }
 impl<T: Brush + 'static> Path<T> {
@@ -20,24 +21,20 @@ impl<T: Brush + 'static> Path<T> {
     where
         T: Clone,
     {
-        Painting::Path(Path {
-            path: self.path,
-            width: self.width,
-        })
+        Painting::Path(self)
     }
 }
 
 pub struct Polygon<T: Brush> {
-    pub polygon: ColorDrawing<T>,
+    pub polygon: Drawing<T>,
+    pub color: LayerData,
 }
 impl<T: Brush + 'static> Polygon<T> {
     pub fn to_painting(self) -> Painting<T>
     where
         T: Clone,
     {
-        Painting::Polygon(Polygon {
-            polygon: self.polygon,
-        })
+        Painting::Polygon(self)
     }
 }
 
@@ -161,16 +158,16 @@ impl<T: Brush> Album<T> {
         for painting in self.paintings {
             new_cell.elems.push(match painting {
                 Painting::Path(p) => GdsElement::GdsPath(GdsPath {
-                    layer: p.path.color.layer,
-                    datatype: p.path.color.datatype,
-                    xy: p.path.drawing.to_xy(database_unit),
+                    layer: p.color.layer,
+                    datatype: p.color.datatype,
+                    xy: p.coordinates.to_xy(database_unit),
                     width: (p.width / database_unit).to_i32(),
                     ..Default::default()
                 }),
                 Painting::Polygon(p) => GdsElement::GdsBoundary(GdsBoundary {
-                    layer: p.polygon.color.layer,
-                    datatype: p.polygon.color.datatype,
-                    xy: p.polygon.drawing.to_xy(database_unit),
+                    layer: p.color.layer,
+                    datatype: p.color.datatype,
+                    xy: p.polygon.to_xy(database_unit),
                     ..Default::default()
                 }),
                 Painting::Ref(r) => GdsElement::GdsStructRef(GdsStructRef {
