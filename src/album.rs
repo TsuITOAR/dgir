@@ -1,9 +1,8 @@
 use std::ops::{Deref, DerefMut};
 
 use crate::{
-    draw::{Brush, Convert},
+    draw::{Brush, Coordinate},
     paint::ColorDrawing,
-    units::{Length, Micrometer},
 };
 
 pub struct Path<T: Brush> {
@@ -11,13 +10,13 @@ pub struct Path<T: Brush> {
     pub width: T,
 }
 impl<'a, T: Brush + 'static> Path<T> {
-    pub fn to_painting<U: Brush>(self) -> Painting<'a, U>
+    pub fn to_painting(self) -> Painting<'a, T>
     where
-        T: Clone + Convert<U>,
+        T: Clone,
     {
-        Painting::Path(Path::<U> {
-            path: self.path.convert(),
-            width: self.width.convert(),
+        Painting::Path(Path {
+            path: self.path,
+            width: self.width,
         })
     }
 }
@@ -26,29 +25,31 @@ pub struct Polygon<T: Brush> {
     pub polygon: ColorDrawing<T>,
 }
 impl<'a, T: Brush + 'static> Polygon<T> {
-    pub fn to_painting<U: Brush>(self) -> Painting<'a, U>
+    pub fn to_painting(self) -> Painting<'a, T>
     where
-        T: Clone + Convert<U>,
+        T: Clone,
     {
-        Painting::Polygon(Polygon::<U> {
-            polygon: self.polygon.convert(),
+        Painting::Polygon(Polygon {
+            polygon: self.polygon,
         })
     }
 }
 #[derive(Clone, Default, Debug)]
 pub struct Decorator {
-    trans: gds21::GdsStrans,
+    pub(crate) trans: gds21::GdsStrans,
 }
 
 pub struct Ref<'a, T: Brush> {
-    decorator: Decorator,
-    reference: &'a Album<'a, T>,
+    pub(crate) decorator: Decorator,
+    pub(crate) position: Coordinate<T>,
+    pub(crate) reference: &'a Album<'a, T>,
 }
 
 impl<'a, T: Brush> From<&'a Album<'a, T>> for Ref<'a, T> {
     fn from(album: &'a Album<T>) -> Self {
         Self {
             decorator: Decorator::default(),
+            position: Coordinate::default(),
             reference: album,
         }
     }
@@ -72,7 +73,7 @@ pub enum Painting<'a, T: Brush> {
     Ref(Ref<'a, T>),
 }
 
-impl<'a, T: Clone + Brush + Convert<U> + 'static, U: Brush> Convert<Painting<'a, U>>
+/* impl<'a, T: Clone + Brush + Convert<U> + 'static, U: Brush> Convert<Painting<'a, U>>
     for Painting<'a, T>
 {
     fn convert(self) -> Painting<'a, U> {
@@ -84,12 +85,16 @@ impl<'a, T: Clone + Brush + Convert<U> + 'static, U: Brush> Convert<Painting<'a,
             Painting::Polygon(polygon) => Painting::Polygon(Polygon {
                 polygon: polygon.polygon.convert(),
             }),
-            Painting::Ref(r) => {}
+            Painting::Ref(r) => Painting::Ref(Ref {
+                position: r.position.convert(),
+                decorator: r.decorator,
+                reference: r.reference.convert(),
+            }),
         }
     }
 }
-
-pub struct Album<'a, T: Brush = Length<Micrometer, f64>> {
+ */
+pub struct Album<'a, T: Brush> {
     pub name: String,
     pub(crate) paintings: Vec<Painting<'a, T>>,
 }
@@ -119,7 +124,7 @@ impl<'a, T: Brush> DerefMut for Album<'a, T> {
         &mut self.paintings
     }
 }
-impl<'a, T: Clone + Brush + Convert<U> + 'static, U: Brush> Convert<Album<'a, U>> for Album<'a, T> {
+/* impl<'a, T: Clone + Brush + Convert<U> + 'static, U: Brush> Convert<Album<'a, U>> for Album<'a, T> {
     fn convert(self) -> Album<'a, U> {
         Album::<'a, U> {
             name: self.name,
@@ -127,4 +132,4 @@ impl<'a, T: Clone + Brush + Convert<U> + 'static, U: Brush> Convert<Album<'a, U>
             paintings: self.paintings.into_iter().map(|x| x.convert()).collect(),
         }
     }
-}
+} */

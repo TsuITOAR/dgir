@@ -1,26 +1,26 @@
 use std::ops::{Add, Div, Mul, Sub};
 
-use crate::units::{Length, Unit};
+use crate::units::{AbsoluteLength, Length, LengthType, MakeLength, Meter};
 use arrayvec::ArrayVec;
-use num::{Num, ToPrimitive};
+use num::{FromPrimitive, Num, ToPrimitive};
 
 pub mod elements;
 
 //TO-DO:This actually cost more time for little file, need to figure out
-type Coordinate<T> = ArrayVec<T, 2>;
+pub(crate) type Coordinate<T> = ArrayVec<T, 2>;
 pub enum Resolution<T> {
     MinDistance(T),
     MinNumber(usize),
 }
-pub trait Convert<T> {
+/* pub trait Convert<T> {
     fn convert(self) -> T;
 }
 
-impl<U: Unit<S>, V: Unit<S>, S: Num + Copy> Convert<Length<V, S>> for Length<U, S> {
-    fn convert(self) -> Length<V, S> {
+impl<U: LengthType<S>, V: LengthType<S>, S: Num + Copy> Convert<MakeLength<V, S>> for MakeLength<U, S> {
+    fn convert(self) -> MakeLength<V, S> {
         self.conversion()
     }
-}
+} */
 pub trait Brush:
     Sized
     + Add<Self, Output = Self>
@@ -29,14 +29,14 @@ pub trait Brush:
     + Div<Self, Output = Self::Basic>
 {
     type Basic: Num + Sized + Copy + ToPrimitive;
+    fn from(meter: f64) -> Self;
 }
 
-impl<U: Unit<S>, S: Num + Copy + ToPrimitive> Brush for Length<U, S> {
+impl<S: Num + Copy + ToPrimitive+FromPrimitive> Brush for Length<AbsoluteLength<S>, S> {
     type Basic = S;
-}
-
-impl Brush for f64 {
-    type Basic = f64;
+    fn from(meter: f64) -> Self {
+        MakeLength::<Meter, S>::new_absolute(S::from_f64(meter).unwrap())
+    }
 }
 pub struct Ruler<In: 'static, Out: 'static> {
     list: Box<dyn Iterator<Item = In>>,
@@ -72,19 +72,15 @@ pub enum Drawing<T> {
     Points(Vec<Coordinate<T>>),
 }
 impl<T: Brush + Clone> Drawing<T> {
-    pub(crate) fn to_xy<U>(self, database_unit: U) -> Vec<i32>
-    where
-        U: Clone + Convert<T>,
-    {
-        let database_unit = database_unit.convert();
-        let convert = |x: T| (x / database_unit.clone()).to_i32().unwrap();
+    pub(crate) fn to_xy(self, database_length: T) -> Vec<i32> {
+        let convert = |x: T| (x / database_length.clone()).to_i32().unwrap();
         match self {
             Drawing::Iter(iter) => iter.flatten().map(convert).collect(),
             Drawing::Points(points) => points.into_iter().flatten().map(convert).collect(),
         }
     }
 }
-impl<U, T: Clone + Convert<U> + 'static> Convert<Coordinate<U>> for Coordinate<T> {
+/* impl<U, T: Clone + Convert<U> + 'static> Convert<Coordinate<U>> for Coordinate<T> {
     fn convert(self) -> Coordinate<U> {
         self.into_iter().map(|x| x.convert()).collect()
     }
@@ -99,3 +95,4 @@ impl<U, T: Clone + Convert<U> + 'static> Convert<Drawing<U>> for Drawing<T> {
         }
     }
 }
+ */

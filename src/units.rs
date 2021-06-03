@@ -4,109 +4,143 @@ use std::{
     ops::{Add, Div, Mul, Sub},
 };
 
-use num::Num;
+use num::{FromPrimitive, Num};
 
-pub trait Unit<S: Num>: Copy {
-    const CONVERSION_FACTOR: S;
+pub trait AbsoluteUnit<S: Num + FromPrimitive>: Copy {
+    const CONVERSION_FACTOR: f64;
+}
+
+pub trait RelativeUnit<S: Num + FromPrimitive>: Copy {
+    const CONVERSION_FACTOR: f64;
 }
 #[derive(Clone, Debug)]
-pub struct Length<U: Unit<S>, S: Num = f64> {
-    pub value: S,
-    units: PhantomData<U>,
+pub struct MakeLength<U, S: Num = f64> {
+    marker: PhantomData<(U, S)>,
 }
 
-impl<U: Unit<S>, S: Num> Length<U, S> {
-    pub fn new(value: S) -> Self {
-        Self {
-            value: value * <U as Unit<S>>::CONVERSION_FACTOR,
-            units: PhantomData,
+impl<U, S: Num + FromPrimitive> MakeLength<U, S> {
+    pub fn new_absolute(value: S) -> Length<AbsoluteLength<S>, S>
+    where
+        U: AbsoluteUnit<S>,
+    {
+        Length {
+            value: value * S::from_f64(<U as AbsoluteUnit<S>>::CONVERSION_FACTOR).unwrap(),
+            marker: PhantomData,
         }
     }
-    pub(crate) fn conversion<V: Unit<S>>(self) -> Length<V, S> {
-        Length::<V, S> {
-            value: self.value,
-            units: PhantomData,
+    pub fn new_relative(value: S) -> Length<RelativeLength<S>, S>
+    where
+        U: RelativeUnit<S>,
+    {
+        Length {
+            value: value * S::from_f64(<U as RelativeUnit<S>>::CONVERSION_FACTOR).unwrap(),
+            marker: PhantomData,
         }
     }
 }
-impl<U: Unit<S>, S: Num + Copy> Copy for Length<U, S> {}
+#[derive(Debug, Clone, Copy, Default)]
+pub(crate) struct Length<T: LengthType<S>, S> {
+    value: S,
+    marker: PhantomData<T>,
+}
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct AbsoluteLength<S> {
+    marker: PhantomData<S>,
+}
 
-impl<U: Unit<S>, V: Unit<S>, S: Num> Add<Length<V, S>> for Length<U, S> {
-    type Output = Length<U, S>;
-    fn add(mut self, rhs: Length<V, S>) -> Self::Output {
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct RelativeLength<S> {
+    marker: PhantomData<S>,
+}
+
+pub(crate) trait LengthType<S> {}
+impl<S> LengthType<S> for AbsoluteLength<S> {}
+impl<S> LengthType<S> for RelativeLength<S> {}
+
+impl<U: AbsoluteUnit<S> + FromPrimitive, S: Num + Copy + FromPrimitive> Copy for MakeLength<U, S> {}
+
+impl<T: LengthType<S>, S: Num> Add<Length<T, S>> for Length<T, S> {
+    type Output = Length<T, S>;
+    fn add(mut self, rhs: Length<T, S>) -> Self::Output {
         self.value = self.value + rhs.value;
         self
     }
 }
 
-impl<U: Unit<S>, V: Unit<S>, S: Num> Sub<Length<V, S>> for Length<U, S> {
-    type Output = Length<U, S>;
-    fn sub(mut self, rhs: Length<V, S>) -> Self::Output {
+impl<T: LengthType<S>, S: Num> Sub<Length<T, S>> for Length<T, S> {
+    type Output = Length<T, S>;
+    fn sub(mut self, rhs: Length<T, S>) -> Self::Output {
         self.value = self.value - rhs.value;
         self
     }
 }
 
-impl<U: Unit<S>, S: Num> Mul<S> for Length<U, S> {
-    type Output = Length<U, S>;
+impl<T: LengthType<S>, S: Num> Mul<S> for Length<T, S> {
+    type Output = Length<T, S>;
     fn mul(mut self, rhs: S) -> Self::Output {
         self.value = self.value * rhs;
         self
     }
 }
 
-impl<U: Unit<S>, V: Unit<S>, S: Num> Div<Length<V, S>> for Length<U, S> {
+impl<T: LengthType<S>, S: Num> Div<Length<T, S>> for Length<T, S> {
     type Output = S;
-    fn div(self, rhs: Length<V, S>) -> Self::Output {
+    fn div(self, rhs: Length<T, S>) -> Self::Output {
         self.value / rhs.value
     }
 }
 
-impl<U: Unit<S>, V: Unit<S>, S: Num + PartialEq> PartialEq<Length<V, S>> for Length<U, S> {
-    fn eq(&self, other: &Length<V, S>) -> bool {
+impl<T: LengthType<S>, S: Num + PartialEq> PartialEq<Length<T, S>> for Length<T, S> {
+    fn eq(&self, other: &Length<T, S>) -> bool {
         self.value == other.value
     }
 }
 
-impl<U: Unit<S>, V: Unit<S>, S: Num + PartialOrd> PartialOrd<Length<V, S>> for Length<U, S> {
-    fn partial_cmp(&self, other: &Length<V, S>) -> Option<std::cmp::Ordering> {
+impl<T: LengthType<S>, S: Num + PartialOrd> PartialOrd<Length<T, S>> for Length<T, S> {
+    fn partial_cmp(&self, other: &Length<T, S>) -> Option<std::cmp::Ordering> {
         self.value.partial_cmp(&other.value)
     }
 }
 #[derive(Debug, Clone, Copy)]
 pub struct Nanometer;
-impl Unit<f64> for Nanometer {
+impl<S:FromPrimitive+Num> AbsoluteUnit<S> for Nanometer {
     const CONVERSION_FACTOR: f64 = 1e-3;
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct Micrometer;
-impl Unit<f64> for Micrometer {
+impl<S:FromPrimitive+Num> AbsoluteUnit<S> for Micrometer {
     const CONVERSION_FACTOR: f64 = 1e0;
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct Millimeter;
-impl Unit<f64> for Millimeter {
+impl<S:FromPrimitive+Num> AbsoluteUnit<S> for Millimeter {
     const CONVERSION_FACTOR: f64 = 1e3;
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct Centimeter;
-impl Unit<f64> for Centimeter {
+impl<S: FromPrimitive + Num> AbsoluteUnit<S> for Centimeter {
     const CONVERSION_FACTOR: f64 = 1e4;
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct Meter;
-impl Unit<f64> for Meter {
+impl<S: FromPrimitive + Num> AbsoluteUnit<S> for Meter {
     const CONVERSION_FACTOR: f64 = 1e6;
 }
+#[derive(Debug, Clone, Copy)]
+pub struct UserUnit;
+impl<S: FromPrimitive + Num> RelativeUnit<S> for UserUnit {
+    const CONVERSION_FACTOR: f64 = 1.;
+}
+
 #[test]
-fn units_operation() {
-    let l1 = Length::<Nanometer>::new(1000.);
-    let l2 = Length::<Micrometer>::new(1.);
-    let l3 = Length::<Millimeter>::new(1.);
+fn AbsoluteUnits_operation() {
+    let l1 = MakeLength::<Nanometer>::new_absolute(1000.);
+    let l2 = MakeLength::<Micrometer>::new_absolute(1.);
+    let l3 = MakeLength::<Millimeter>::new_absolute(1.);
     assert_eq!(l1, l2);
     assert_eq!(l3, l2 * 1000.);
     assert_eq!(l3, (l1 + l2) * 500.);

@@ -4,32 +4,32 @@ pub mod paint;
 pub mod units;
 
 use album::Album;
-use draw::{Brush, Convert};
-use num::ToPrimitive;
+use draw::Brush;
+use num::{FromPrimitive, ToPrimitive};
 use std::ops::{Deref, DerefMut};
 use units::Micrometer;
 
 use crate::{
     album::Painting,
-    units::{Length, Meter},
+    units::{MakeLength, Meter},
 };
-pub struct Library<T: Brush> {
+pub struct Library<'a, T: Brush> {
     name: String,
-    albums: Vec<Album<T>>,
+    albums: Vec<Album<'a, T>>,
 }
-impl<T: Brush> Deref for Library<T> {
-    type Target = Vec<Album<T>>;
+impl<'a, T: Brush> Deref for Library<'a, T> {
+    type Target = Vec<Album<'a, T>>;
     fn deref(&self) -> &Self::Target {
         &self.albums
     }
 }
 
-impl<T: Brush> DerefMut for Library<T> {
+impl<'a, T: Brush> DerefMut for Library<'a, T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.albums
     }
 }
-impl<T: Brush> Library<T> {
+impl<'a, T: Brush> Library<'a, T> {
     pub fn new(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
@@ -40,15 +40,19 @@ impl<T: Brush> Library<T> {
         self.name = name;
         self
     }
-    pub fn to_gds(self, user_unit: f64, database_unit: f64) -> gds21::GdsLibrary
+    pub fn to_gds(self, user_unit: T, database_unit: T) -> gds21::GdsLibrary
     where
-        Length<Meter>: Convert<T>,
         T: Brush + Clone,
+        <T as Brush>::Basic: ToPrimitive + FromPrimitive,
     {
         use gds21::*;
         let mut lib = GdsLibrary::new(self.name);
-        lib.units = GdsUnits::new(user_unit / database_unit, database_unit);
-        let database_unit = Length::<Meter>::new(database_unit);
+        lib.units = GdsUnits::new(
+            (user_unit / database_unit).to_f64().unwrap(),
+            (database_unit / <T as Brush>::from(1.)).to_f64().unwrap(),
+        );
+        let database_length =
+            MakeLength::<Meter, <T as Brush>::Basic>::new_absolute(database_unit);
         for album in self.albums {
             lib.structs.push({
                 let mut new_cell = GdsStruct::new(album.name);
@@ -57,14 +61,20 @@ impl<T: Brush> Library<T> {
                         Painting::Path(p) => GdsElement::GdsPath(GdsPath {
                             layer: p.path.color.layer,
                             datatype: p.path.color.datatype,
-                            xy: p.path.drawing.to_xy(database_unit),
-                            width: (p.width / database_unit.convert()).to_i32(),
+                            xy: p.path.drawing.to_xy(database_length),
+                            width: (p.width / database_length).to_i32(),
                             ..Default::default()
                         }),
                         Painting::Polygon(p) => GdsElement::GdsBoundary(GdsBoundary {
                             layer: p.polygon.color.layer,
                             datatype: p.polygon.color.datatype,
                             xy: p.polygon.drawing.to_xy(database_unit),
+                            ..Default::default()
+                        }),
+                        Painting::Ref(r) => GdsElement::GdsStructRef(GdsStructRef {
+                            name: r.reference.name,
+                            xy: r.position.into_iter().map(|x| (x / database_unit).to_i32()),
+                            strans: r.decorator.trans,
                             ..Default::default()
                         }),
                     })
@@ -76,5 +86,5 @@ impl<T: Brush> Library<T> {
     }
 }
 
-pub type Lib = Library<Length<Micrometer, f64>>;
-pub type Alb = Album<Length<Micrometer, f64>>;
+pub type Lib<'a> = Library<'a, MakeLength<Micrometer, f64>>;
+pub type Alb<'a> = Album<'a, MakeLength<Micrometer, f64>>;

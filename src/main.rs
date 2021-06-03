@@ -11,7 +11,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let start = Instant::now();
     let mut lib = Lib::new("first_lib");
     let mut album = Alb::new("first_alb");
-    let micro = Length::<Micrometer>::new(1.);
+    let micro = MakeLength::<Micrometer>::new(1.);
     let layer = LayerData::new(1, 0);
     let circle = draw::elements::Circle::new(
         (micro * 0., micro * 0.),
