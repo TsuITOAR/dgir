@@ -29,7 +29,7 @@ pub trait Brush:
     + Div<Self, Output = Self::Basic>
     + Zero
 {
-    type Basic: Num + Sized + Copy + ToPrimitive;
+    type Basic: Num + Sized + Copy + ToPrimitive + FromPrimitive;
     fn from(meter: f64) -> Self;
 }
 

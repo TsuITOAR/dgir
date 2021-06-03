@@ -78,14 +78,17 @@ impl<S: Copy, A: Angle + Copy> Rectangle<S, A> {
     }
     pub fn from_lens(x: S, y: S) -> Self
     where
-        S: FromPrimitive + Float,
+        S: Brush,
     {
         Self {
             point1: (
-                x.neg() / S::from_f64(2.).unwrap(),
-                y.neg() / S::from_f64(2.).unwrap(),
+                x * <S as Brush>::Basic::from_f64(-0.5).unwrap(),
+                y * <S as Brush>::Basic::from_f64(-0.5).unwrap(),
             ),
-            point2: (x / S::from_f64(2.).unwrap(), y / S::from_f64(2.).unwrap()),
+            point2: (
+                x * <S as Brush>::Basic::from_f64(0.5).unwrap(),
+                y * <S as Brush>::Basic::from_f64(0.5).unwrap(),
+            ),
             angle: None,
         }
     }
@@ -114,6 +117,7 @@ where
             (self.point2.0, self.point1.1),
             (self.point2.0, self.point2.1),
             (self.point1.0, self.point2.1),
+            (self.point1.0, self.point1.1),
         ];
         let (x, y): (
             Box<dyn FnMut(Self::In) -> Self::Out>,
