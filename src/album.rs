@@ -45,15 +45,18 @@ pub struct Ref<T: Brush> {
     pub(crate) decorator: Option<gds21::GdsStrans>,
     pub(crate) position: Coordinate<T>,
     pub(crate) reference: String,
-    pub(crate) dependencies: BTreeSet<Rc<Album<T>>>,
+    pub(crate) dependencies: Option<BTreeSet<Rc<Album<T>>>>,
 }
 
 impl<T: Brush> From<Album<T>> for Ref<T> {
-    fn from(album: Album<T>) -> Self {
+    fn from(mut album: Album<T>) -> Self {
         let mut dependencies = BTreeSet::new();
-        for painting in album.paintings.iter() {
+        for painting in album.paintings.iter_mut() {
             match painting {
-                Painting::Ref(r) => dependencies.append(&mut r.dependencies.clone()),
+                Painting::Ref(Ref {
+                    dependencies: Some(ref mut d),
+                    ..
+                }) => dependencies.append(d),
                 _ => (),
             }
         }
@@ -63,9 +66,9 @@ impl<T: Brush> From<Album<T>> for Ref<T> {
         }
         Self {
             decorator: None,
-            position: Coordinate::default(),
+            position: Coordinate::from([T::zero(), T::zero()]),
             reference: album.name.clone(),
-            dependencies,
+            dependencies: Some(dependencies),
         }
     }
 }
@@ -92,28 +95,22 @@ pub enum Painting<T: Brush> {
     Ref(Ref<T>),
 }
 
-/* impl<'a, T: Clone + Brush + Convert<U> + 'static, U: Brush> Convert<Painting<'a, U>>
-    for Painting<'a, T>
-{
-    fn convert(self) -> Painting<'a, U> {
-        match self {
-            Painting::Path(path) => Painting::Path(Path {
-                path: path.path.convert(),
-                width: path.width.convert(),
-            }),
-            Painting::Polygon(polygon) => Painting::Polygon(Polygon {
-                polygon: polygon.polygon.convert(),
-            }),
-            Painting::Ref(r) => Painting::Ref(Ref {
-                position: r.position.convert(),
-                decorator: r.decorator,
-                reference: r.reference.convert(),
-            }),
-        }
+impl<T: Brush> From<Path<T>> for Painting<T> {
+    fn from(p: Path<T>) -> Self {
+        Painting::Path(p)
     }
 }
- */
 
+impl<T: Brush> From<Polygon<T>> for Painting<T> {
+    fn from(p: Polygon<T>) -> Self {
+        Painting::Polygon(p)
+    }
+}
+impl<T: Brush> From<Ref<T>> for Painting<T> {
+    fn from(r: Ref<T>) -> Self {
+        Painting::Ref(r)
+    }
+}
 pub struct Album<T: Brush> {
     pub name: String,
     pub(crate) paintings: Vec<Painting<T>>,
@@ -130,15 +127,23 @@ impl<T: Brush> Album<T> {
         self.name = name;
         self
     }
+    pub fn insert<U: Into<Painting<T>>>(&mut self, painting: U) -> &mut Self {
+        self.push(painting.into());
+        self
+    }
+
     pub fn as_ref(self) -> Ref<T> {
         self.into()
     }
-    pub fn get_dependencies(&self) -> BTreeSet<Rc<Album<T>>> {
+    pub fn get_dependencies(&mut self) -> BTreeSet<Rc<Album<T>>> {
         let mut dependencies = BTreeSet::new();
-        for painting in self.paintings.iter() {
+        for painting in self.paintings.iter_mut() {
             match painting {
-                Painting::Ref(r) => {
-                    dependencies.append(&mut r.dependencies.clone());
+                Painting::Ref(Ref {
+                    dependencies: Some(ref mut d),
+                    ..
+                }) => {
+                    dependencies.append(d);
                 }
                 _ => (),
             }
@@ -146,10 +151,7 @@ impl<T: Brush> Album<T> {
         dependencies
     }
 
-    pub fn to_cell(
-        self,
-        database_unit: T,
-    ) -> gds21::GdsStruct
+    pub fn to_cell(self, database_unit: T) -> gds21::GdsStruct
     where
         T: Clone + Copy,
         <T as Brush>::Basic: ToPrimitive + FromPrimitive,
@@ -171,18 +173,16 @@ impl<T: Brush> Album<T> {
                     xy: p.polygon.drawing.to_xy(database_unit),
                     ..Default::default()
                 }),
-                Painting::Ref(r) => {
-                    GdsElement::GdsStructRef(GdsStructRef {
-                        name: r.reference,
-                        xy: r
-                            .position
-                            .into_iter()
-                            .map(|x| (x / database_unit).to_i32().unwrap())
-                            .collect(),
-                        strans: r.decorator,
-                        ..Default::default()
-                    })
-                }
+                Painting::Ref(r) => GdsElement::GdsStructRef(GdsStructRef {
+                    name: r.reference,
+                    xy: r
+                        .position
+                        .into_iter()
+                        .map(|x| (x / database_unit).to_i32().unwrap())
+                        .collect(),
+                    strans: r.decorator,
+                    ..Default::default()
+                }),
             })
         }
         new_cell
@@ -219,13 +219,3 @@ impl<T: Brush> DerefMut for Album<T> {
         &mut self.paintings
     }
 }
-
-/* impl<'a, T: Clone + Brush + Convert<U> + 'static, U: Brush> Convert<Album<'a, U>> for Album<'a, T> {
-    fn convert(self) -> Album<'a, U> {
-        Album::<'a, U> {
-            name: self.name,
-            //TO-DO:this consumes paintings, break the share between structure, change this to a decorator after the original output
-            paintings: self.paintings.into_iter().map(|x| x.convert()).collect(),
-        }
-    }
-} */

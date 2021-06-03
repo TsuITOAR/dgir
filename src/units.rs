@@ -4,7 +4,7 @@ use std::{
     ops::{Add, Div, Mul, Sub},
 };
 
-use num::{FromPrimitive, Num};
+use num::{FromPrimitive, Num, Zero};
 
 pub trait AbsoluteUnit {
     const CONVERSION_FACTOR: f64;
@@ -44,15 +44,6 @@ impl<S> Length<Relative, S> {
         }
     }
 }
-#[derive(Debug, Clone, Copy)]
-pub struct Absolute;
-
-#[derive(Debug, Clone, Copy)]
-pub struct Relative;
-
-pub trait LengthType {}
-impl LengthType for Absolute {}
-impl LengthType for Relative {}
 
 impl<T: LengthType, S: Num> Add<Length<T, S>> for Length<T, S> {
     type Output = Length<T, S>;
@@ -105,6 +96,27 @@ impl<T: LengthType, S: Num + PartialOrd> PartialOrd<Length<T, S>> for Length<T, 
         self.value.partial_cmp(&other.value)
     }
 }
+
+impl<U: LengthType, S: Zero + Num> Zero for Length<U, S> {
+    fn zero() -> Self {
+        Length {
+            value: S::zero(),
+            marker: PhantomData,
+        }
+    }
+    fn is_zero(&self) -> bool {
+        self.value.is_zero()
+    }
+}
+#[derive(Debug, Clone, Copy)]
+pub struct Absolute;
+
+#[derive(Debug, Clone, Copy)]
+pub struct Relative;
+
+pub trait LengthType {}
+impl LengthType for Absolute {}
+impl LengthType for Relative {}
 #[derive(Debug, Clone, Copy)]
 pub struct Nanometer;
 impl AbsoluteUnit for Nanometer {

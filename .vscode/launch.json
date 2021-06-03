@@ -1,37 +1,53 @@
 {
-	"version": "0.2.0",
-	"configurations": [
-		{
-			"name": "(Windows) 启动",
-			"preLaunchTask": "rust: cargo build",
-			"type": "cppvsdbg",
-			"request": "launch",
-			"program": "${workspaceFolder}/target/debug/${workspaceFolderBasename}.exe",
-			"args": [],
-			"stopAtEntry": false,
-			"cwd": "${workspaceFolder}",
-			"environment": [],
-			"console": "integratedTerminal",
-		},
-		{
-			"name": "(gdb) 启动",
-			"type": "cppdbg",
-			"request": "launch",
-			"program": "${workspaceFolder}/target/debug/${workspaceFolderBasename}.exe",
-			"args": [],
-			"stopAtEntry": false,
-			"cwd": "${workspaceFolder}",
-			"environment": [],
-			"externalConsole": true,
-			"MIMode": "gdb",
-			"miDebuggerPath": "C:\\Program Files\\mingw-w64\\x86_64-8.1.0-posix-seh-rt_v6-rev0\\mingw64\\bin\\gdb.exe",
-			"setupCommands": [
-				{
-					"description": "为 gdb 启用整齐打印",
-					"text": "-enable-pretty-printing",
-					"ignoreFailures": true
-				}
-			]
-		}
-	]
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "(Windows) 启动",
+            "preLaunchTask": "rust: cargo build",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/target/debug/${workspaceFolderBasename}.exe",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "console": "integratedTerminal",
+        },
+        {
+            "name": "RUST_BACKTRACE",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/target/debug/${workspaceFolderBasename}.exe",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [
+                {
+                    "name": "RUST_BACKTRACE",
+                    "value": "full"
+                }
+            ],
+            "console": "integratedTerminal",
+        },
+        {
+            "name": "(gdb) 启动",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/target/debug/${workspaceFolderBasename}.exe",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": true,
+            "MIMode": "gdb",
+            "miDebuggerPath": "C:\\Program Files\\mingw-w64\\x86_64-8.1.0-posix-seh-rt_v6-rev0\\mingw64\\bin\\gdb.exe",
+            "setupCommands": [
+                {
+                    "description": "为 gdb 启用整齐打印",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        }
+    ]
 }

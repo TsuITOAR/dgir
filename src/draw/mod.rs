@@ -1,8 +1,11 @@
-use std::ops::{Add, Div, Mul, Sub};
+use std::{
+    marker::PhantomData,
+    ops::{Add, Div, Mul, Sub},
+};
 
-use crate::units::{Absolute, Length, Meter};
+use crate::units::{Absolute, Length, LengthType, Meter};
 use arrayvec::ArrayVec;
-use num::{FromPrimitive, Num, ToPrimitive};
+use num::{FromPrimitive, Num, ToPrimitive, Zero};
 
 pub mod elements;
 
@@ -27,6 +30,7 @@ pub trait Brush:
     + Sub<Self, Output = Self>
     + Mul<Self::Basic, Output = Self>
     + Div<Self, Output = Self::Basic>
+    + Zero
 {
     type Basic: Num + Sized + Copy + ToPrimitive;
     fn from(meter: f64) -> Self;
@@ -80,19 +84,3 @@ impl<T: Brush + Clone> Drawing<T> {
         }
     }
 }
-/* impl<U, T: Clone + Convert<U> + 'static> Convert<Coordinate<U>> for Coordinate<T> {
-    fn convert(self) -> Coordinate<U> {
-        self.into_iter().map(|x| x.convert()).collect()
-    }
-}
-impl<U, T: Clone + Convert<U> + 'static> Convert<Drawing<U>> for Drawing<T> {
-    fn convert(self) -> Drawing<U> {
-        match self {
-            Drawing::Iter(iter) => Drawing::Iter(Box::new(iter.map(|u| u.convert()))),
-            Drawing::Points(points) => {
-                Drawing::Iter(Box::new(points.into_iter().map(|u| u.convert())))
-            }
-        }
-    }
-}
- */

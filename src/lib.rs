@@ -54,13 +54,13 @@ impl<T: Brush> Library<T> {
             (user_unit / database_unit).to_f64().unwrap(),
             (database_unit / <T as Brush>::from(1.)).to_f64().unwrap(),
         );
-        for album in self.albums {
+        for mut album in self.albums {
             dependencies.append(&mut album.get_dependencies());
             dependencies.insert(Rc::new(album));
         }
         for mut album in dependencies {
             lib.structs.push(
-                mem::replace(Rc::get_mut(&mut album).unwrap(), Album::new("_0"))
+                mem::replace(Rc::get_mut(&mut album).unwrap(), Album::new(String::new()))
                     .to_cell(database_unit),
             );
         }
@@ -68,8 +68,8 @@ impl<T: Brush> Library<T> {
     }
 }
 
-pub type Lib<'a> = Library<AbsoluteLength<f64>>;
-pub type Cell<'a> = Album<AbsoluteLength<f64>>;
+pub type Lib = Library<AbsoluteLength<f64>>;
+pub type Cell = Album<AbsoluteLength<f64>>;
 
 pub const NANOMETER: AbsoluteLength<f64> = AbsoluteLength::<f64> {
     value: 1e-3,
