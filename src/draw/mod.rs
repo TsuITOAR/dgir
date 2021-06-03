@@ -1,6 +1,6 @@
 use std::ops::{Add, Div, Mul, Sub};
 
-use crate::units::{AbsoluteLength, Length, LengthType, MakeLength, Meter};
+use crate::units::{Absolute, Length, Meter};
 use arrayvec::ArrayVec;
 use num::{FromPrimitive, Num, ToPrimitive};
 
@@ -32,10 +32,10 @@ pub trait Brush:
     fn from(meter: f64) -> Self;
 }
 
-impl<S: Num + Copy + ToPrimitive+FromPrimitive> Brush for Length<AbsoluteLength<S>, S> {
+impl<S: Num + Copy + ToPrimitive + FromPrimitive> Brush for Length<Absolute, S> {
     type Basic = S;
     fn from(meter: f64) -> Self {
-        MakeLength::<Meter, S>::new_absolute(S::from_f64(meter).unwrap())
+        Length::new_absolute::<Meter>(S::from_f64(meter).unwrap())
     }
 }
 pub struct Ruler<In: 'static, Out: 'static> {

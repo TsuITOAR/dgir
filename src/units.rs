@@ -6,60 +6,55 @@ use std::{
 
 use num::{FromPrimitive, Num};
 
-pub trait AbsoluteUnit<S: Num + FromPrimitive>: Copy {
+pub trait AbsoluteUnit {
     const CONVERSION_FACTOR: f64;
 }
 
-pub trait RelativeUnit<S: Num + FromPrimitive>: Copy {
+pub trait RelativeUnit {
     const CONVERSION_FACTOR: f64;
 }
-#[derive(Clone, Debug)]
-pub struct MakeLength<U, S: Num = f64> {
-    marker: PhantomData<(U, S)>,
-}
 
-impl<U, S: Num + FromPrimitive> MakeLength<U, S> {
-    pub fn new_absolute(value: S) -> Length<AbsoluteLength<S>, S>
-    where
-        U: AbsoluteUnit<S>,
-    {
-        Length {
-            value: value * S::from_f64(<U as AbsoluteUnit<S>>::CONVERSION_FACTOR).unwrap(),
-            marker: PhantomData,
-        }
-    }
-    pub fn new_relative(value: S) -> Length<RelativeLength<S>, S>
-    where
-        U: RelativeUnit<S>,
-    {
-        Length {
-            value: value * S::from_f64(<U as RelativeUnit<S>>::CONVERSION_FACTOR).unwrap(),
-            marker: PhantomData,
-        }
-    }
-}
 #[derive(Debug, Clone, Copy, Default)]
-pub(crate) struct Length<T: LengthType<S>, S> {
-    value: S,
-    marker: PhantomData<T>,
+pub struct Length<T: LengthType, S> {
+    pub(crate) value: S,
+    pub(crate) marker: PhantomData<T>,
+}
+
+impl<S> Length<Absolute, S> {
+    pub fn new_absolute<U>(value: S) -> Length<Absolute, S>
+    where
+        S: Num + FromPrimitive,
+        U: AbsoluteUnit,
+    {
+        Length {
+            value: value * S::from_f64(<U as AbsoluteUnit>::CONVERSION_FACTOR).unwrap(),
+            marker: PhantomData,
+        }
+    }
+}
+impl<S> Length<Relative, S> {
+    pub fn new_relative<U>(value: S) -> Length<Relative, S>
+    where
+        S: Num + FromPrimitive,
+        U: RelativeUnit,
+    {
+        Length {
+            value: value * S::from_f64(<U as RelativeUnit>::CONVERSION_FACTOR).unwrap(),
+            marker: PhantomData,
+        }
+    }
 }
 #[derive(Debug, Clone, Copy)]
-pub(crate) struct AbsoluteLength<S> {
-    marker: PhantomData<S>,
-}
+pub struct Absolute;
 
 #[derive(Debug, Clone, Copy)]
-pub(crate) struct RelativeLength<S> {
-    marker: PhantomData<S>,
-}
+pub struct Relative;
 
-pub(crate) trait LengthType<S> {}
-impl<S> LengthType<S> for AbsoluteLength<S> {}
-impl<S> LengthType<S> for RelativeLength<S> {}
+pub trait LengthType {}
+impl LengthType for Absolute {}
+impl LengthType for Relative {}
 
-impl<U: AbsoluteUnit<S> + FromPrimitive, S: Num + Copy + FromPrimitive> Copy for MakeLength<U, S> {}
-
-impl<T: LengthType<S>, S: Num> Add<Length<T, S>> for Length<T, S> {
+impl<T: LengthType, S: Num> Add<Length<T, S>> for Length<T, S> {
     type Output = Length<T, S>;
     fn add(mut self, rhs: Length<T, S>) -> Self::Output {
         self.value = self.value + rhs.value;
@@ -67,7 +62,7 @@ impl<T: LengthType<S>, S: Num> Add<Length<T, S>> for Length<T, S> {
     }
 }
 
-impl<T: LengthType<S>, S: Num> Sub<Length<T, S>> for Length<T, S> {
+impl<T: LengthType, S: Num> Sub<Length<T, S>> for Length<T, S> {
     type Output = Length<T, S>;
     fn sub(mut self, rhs: Length<T, S>) -> Self::Output {
         self.value = self.value - rhs.value;
@@ -75,7 +70,7 @@ impl<T: LengthType<S>, S: Num> Sub<Length<T, S>> for Length<T, S> {
     }
 }
 
-impl<T: LengthType<S>, S: Num> Mul<S> for Length<T, S> {
+impl<T: LengthType, S: Num> Mul<S> for Length<T, S> {
     type Output = Length<T, S>;
     fn mul(mut self, rhs: S) -> Self::Output {
         self.value = self.value * rhs;
@@ -83,64 +78,76 @@ impl<T: LengthType<S>, S: Num> Mul<S> for Length<T, S> {
     }
 }
 
-impl<T: LengthType<S>, S: Num> Div<Length<T, S>> for Length<T, S> {
+impl<T: LengthType, S: Num> Div<Length<T, S>> for Length<T, S> {
     type Output = S;
     fn div(self, rhs: Length<T, S>) -> Self::Output {
         self.value / rhs.value
     }
 }
+impl<T: LengthType, S: Num> Div<S> for Length<T, S> {
+    type Output = Length<T, S>;
+    fn div(self, rhs: S) -> Self::Output {
+        Self {
+            value: self.value / rhs,
+            marker: self.marker,
+        }
+    }
+}
 
-impl<T: LengthType<S>, S: Num + PartialEq> PartialEq<Length<T, S>> for Length<T, S> {
+impl<T: LengthType, S: Num + PartialEq> PartialEq<Length<T, S>> for Length<T, S> {
     fn eq(&self, other: &Length<T, S>) -> bool {
         self.value == other.value
     }
 }
 
-impl<T: LengthType<S>, S: Num + PartialOrd> PartialOrd<Length<T, S>> for Length<T, S> {
+impl<T: LengthType, S: Num + PartialOrd> PartialOrd<Length<T, S>> for Length<T, S> {
     fn partial_cmp(&self, other: &Length<T, S>) -> Option<std::cmp::Ordering> {
         self.value.partial_cmp(&other.value)
     }
 }
 #[derive(Debug, Clone, Copy)]
 pub struct Nanometer;
-impl<S:FromPrimitive+Num> AbsoluteUnit<S> for Nanometer {
+impl AbsoluteUnit for Nanometer {
     const CONVERSION_FACTOR: f64 = 1e-3;
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct Micrometer;
-impl<S:FromPrimitive+Num> AbsoluteUnit<S> for Micrometer {
+impl AbsoluteUnit for Micrometer {
     const CONVERSION_FACTOR: f64 = 1e0;
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct Millimeter;
-impl<S:FromPrimitive+Num> AbsoluteUnit<S> for Millimeter {
+impl AbsoluteUnit for Millimeter {
     const CONVERSION_FACTOR: f64 = 1e3;
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct Centimeter;
-impl<S: FromPrimitive + Num> AbsoluteUnit<S> for Centimeter {
+impl AbsoluteUnit for Centimeter {
     const CONVERSION_FACTOR: f64 = 1e4;
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct Meter;
-impl<S: FromPrimitive + Num> AbsoluteUnit<S> for Meter {
+impl AbsoluteUnit for Meter {
     const CONVERSION_FACTOR: f64 = 1e6;
 }
 #[derive(Debug, Clone, Copy)]
 pub struct UserUnit;
-impl<S: FromPrimitive + Num> RelativeUnit<S> for UserUnit {
+impl RelativeUnit for UserUnit {
     const CONVERSION_FACTOR: f64 = 1.;
 }
 
+pub type AbsoluteLength<S> = Length<Absolute, S>;
+pub type RelativeLength<S> = Length<Relative, S>;
+
 #[test]
-fn AbsoluteUnits_operation() {
-    let l1 = MakeLength::<Nanometer>::new_absolute(1000.);
-    let l2 = MakeLength::<Micrometer>::new_absolute(1.);
-    let l3 = MakeLength::<Millimeter>::new_absolute(1.);
+fn units_operation() {
+    let l1 = Length::new_absolute::<Nanometer>(1000.);
+    let l2 = Length::new_absolute::<Micrometer>(1.);
+    let l3 = Length::new_absolute::<Millimeter>(1.);
     assert_eq!(l1, l2);
     assert_eq!(l3, l2 * 1000.);
     assert_eq!(l3, (l1 + l2) * 500.);
