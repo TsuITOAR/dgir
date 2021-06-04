@@ -1,10 +1,10 @@
 pub mod album;
 pub mod draw;
-pub mod paint;
+pub mod color;
 pub mod units;
 
 use album::Album;
-use draw::Brush;
+use draw::Distance;
 use num::{FromPrimitive, ToPrimitive};
 use std::{
     collections::BTreeSet,
@@ -15,23 +15,23 @@ use std::{
 };
 use units::AbsoluteLength;
 
-pub struct Library<T: Brush> {
+pub struct Library<T: Distance> {
     name: String,
     albums: Vec<Album<T>>,
 }
-impl<T: Brush> Deref for Library<T> {
+impl<T: Distance> Deref for Library<T> {
     type Target = Vec<Album<T>>;
     fn deref(&self) -> &Self::Target {
         &self.albums
     }
 }
 
-impl<T: Brush> DerefMut for Library<T> {
+impl<T: Distance> DerefMut for Library<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.albums
     }
 }
-impl<T: Brush> Library<T> {
+impl<T: Distance> Library<T> {
     pub fn new(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
@@ -44,15 +44,15 @@ impl<T: Brush> Library<T> {
     }
     pub fn to_gds(self, user_unit: T, database_unit: T) -> gds21::GdsLibrary
     where
-        T: Brush + Clone + Copy,
-        <T as Brush>::Basic: ToPrimitive + FromPrimitive,
+        T: Distance + Clone + Copy,
+        <T as Distance>::Basic: ToPrimitive + FromPrimitive,
     {
         use gds21::*;
         let mut lib = GdsLibrary::new(self.name);
         let mut dependencies = BTreeSet::new();
         lib.units = GdsUnits::new(
             (user_unit / database_unit).to_f64().unwrap(),
-            (database_unit / <T as Brush>::from(1.)).to_f64().unwrap(),
+            (database_unit / <T as Distance>::from(1.)).to_f64().unwrap(),
         );
         for mut album in self.albums {
             dependencies.append(&mut album.get_dependencies());

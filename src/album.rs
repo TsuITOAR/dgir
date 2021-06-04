@@ -7,16 +7,16 @@ use std::{
 use num::{FromPrimitive, ToPrimitive};
 
 use crate::{
-    draw::{Brush, Coordinate, Drawing},
-    paint::LayerData,
+    color::LayerData,
+    draw::{Coordinate, Distance, Drawing},
 };
 
-pub struct Path<T: Brush> {
+pub struct Path<T: Distance> {
     pub coordinates: Drawing<T>,
     pub color: LayerData,
-    pub width: T,
+    pub width: Option<T>,
 }
-impl<T: Brush + 'static> Path<T> {
+impl<T: Distance + 'static> Path<T> {
     pub fn to_painting(self) -> Painting<T>
     where
         T: Clone,
@@ -25,11 +25,11 @@ impl<T: Brush + 'static> Path<T> {
     }
 }
 
-pub struct Polygon<T: Brush> {
-    pub polygon: Drawing<T>,
+pub struct Polygon<T: Distance> {
+    pub coordinates: Drawing<T>,
     pub color: LayerData,
 }
-impl<T: Brush + 'static> Polygon<T> {
+impl<T: Distance + 'static> Polygon<T> {
     pub fn to_painting(self) -> Painting<T>
     where
         T: Clone,
@@ -38,14 +38,14 @@ impl<T: Brush + 'static> Polygon<T> {
     }
 }
 
-pub struct Ref<T: Brush> {
+pub struct Ref<T: Distance> {
     pub(crate) decorator: Option<gds21::GdsStrans>,
     pub(crate) position: Coordinate<T>,
     pub(crate) reference: String,
     pub(crate) dependencies: Option<BTreeSet<Rc<Album<T>>>>,
 }
 
-impl<T: Brush> From<Album<T>> for Ref<T> {
+impl<T: Distance> From<Album<T>> for Ref<T> {
     fn from(mut album: Album<T>) -> Self {
         let mut dependencies = BTreeSet::new();
         for painting in album.paintings.iter_mut() {
@@ -70,7 +70,7 @@ impl<T: Brush> From<Album<T>> for Ref<T> {
     }
 }
 
-impl<T: Brush> Ref<T> {
+impl<T: Distance> Ref<T> {
     pub fn new(album: Album<T>) -> Self {
         Self::from(album)
     }
@@ -86,34 +86,34 @@ impl<T: Brush> Ref<T> {
         &mut self.decorator
     }
 }
-pub enum Painting<T: Brush> {
+pub enum Painting<T: Distance> {
     Path(Path<T>),
     Polygon(Polygon<T>),
     Ref(Ref<T>),
 }
 
-impl<T: Brush> From<Path<T>> for Painting<T> {
+impl<T: Distance> From<Path<T>> for Painting<T> {
     fn from(p: Path<T>) -> Self {
         Painting::Path(p)
     }
 }
 
-impl<T: Brush> From<Polygon<T>> for Painting<T> {
+impl<T: Distance> From<Polygon<T>> for Painting<T> {
     fn from(p: Polygon<T>) -> Self {
         Painting::Polygon(p)
     }
 }
-impl<T: Brush> From<Ref<T>> for Painting<T> {
+impl<T: Distance> From<Ref<T>> for Painting<T> {
     fn from(r: Ref<T>) -> Self {
         Painting::Ref(r)
     }
 }
-pub struct Album<T: Brush> {
+pub struct Album<T: Distance> {
     pub name: String,
     pub(crate) paintings: Vec<Painting<T>>,
 }
 
-impl<T: Brush> Album<T> {
+impl<T: Distance> Album<T> {
     pub fn new(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
@@ -151,7 +151,7 @@ impl<T: Brush> Album<T> {
     pub fn to_cell(self, database_unit: T) -> gds21::GdsStruct
     where
         T: Clone + Copy,
-        <T as Brush>::Basic: ToPrimitive + FromPrimitive,
+        <T as Distance>::Basic: ToPrimitive + FromPrimitive,
     {
         use gds21::*;
         let mut new_cell = GdsStruct::new(self.name);
@@ -161,13 +161,16 @@ impl<T: Brush> Album<T> {
                     layer: p.color.layer,
                     datatype: p.color.datatype,
                     xy: p.coordinates.to_xy(database_unit),
-                    width: (p.width / database_unit).to_i32(),
+                    width: match p.width {
+                        Some(l) => (l / database_unit).to_i32(),
+                        None => None,
+                    },
                     ..Default::default()
                 }),
                 Painting::Polygon(p) => GdsElement::GdsBoundary(GdsBoundary {
                     layer: p.color.layer,
                     datatype: p.color.datatype,
-                    xy: p.polygon.to_xy(database_unit),
+                    xy: p.coordinates.to_xy(database_unit),
                     ..Default::default()
                 }),
                 Painting::Ref(r) => GdsElement::GdsStructRef(GdsStructRef {
@@ -186,32 +189,32 @@ impl<T: Brush> Album<T> {
     }
 }
 
-impl<T: Brush> PartialEq for Album<T> {
+impl<T: Distance> PartialEq for Album<T> {
     fn eq(&self, other: &Self) -> bool {
         self.name.eq(&other.name)
     }
 }
-impl<T: Brush> Eq for Album<T> {}
+impl<T: Distance> Eq for Album<T> {}
 
-impl<T: Brush> PartialOrd for Album<T> {
+impl<T: Distance> PartialOrd for Album<T> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         self.name.partial_cmp(&other.name)
     }
 }
-impl<T: Brush> Ord for Album<T> {
+impl<T: Distance> Ord for Album<T> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.name.cmp(&other.name)
     }
 }
 
-impl<T: Brush> Deref for Album<T> {
+impl<T: Distance> Deref for Album<T> {
     type Target = Vec<Painting<T>>;
     fn deref(&self) -> &Self::Target {
         &self.paintings
     }
 }
 
-impl<T: Brush> DerefMut for Album<T> {
+impl<T: Distance> DerefMut for Album<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.paintings
     }

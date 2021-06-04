@@ -21,7 +21,7 @@ impl<U: LengthType<S>, V: LengthType<S>, S: Num + Copy> Convert<MakeLength<V, S>
         self.conversion()
     }
 } */
-pub trait Brush:
+pub trait Distance:
     Sized
     + Add<Self, Output = Self>
     + Sub<Self, Output = Self>
@@ -33,7 +33,7 @@ pub trait Brush:
     fn from(meter: f64) -> Self;
 }
 
-impl<S: Num + Copy + ToPrimitive + FromPrimitive> Brush for Length<Absolute, S> {
+impl<S: Num + Copy + ToPrimitive + FromPrimitive> Distance for Length<Absolute, S> {
     type Basic = S;
     fn from(meter: f64) -> Self {
         Length::new_absolute::<Meter>(S::from_f64(meter).unwrap())
@@ -72,7 +72,7 @@ pub enum Drawing<T> {
     Iter(Box<dyn Iterator<Item = Coordinate<T>>>),
     Points(Vec<Coordinate<T>>),
 }
-impl<T: Brush + Clone> Drawing<T> {
+impl<T: Distance + Clone> Drawing<T> {
     pub(crate) fn to_xy(self, database_length: T) -> Vec<i32> {
         let convert = |x: T| (x / database_length.clone()).to_i32().unwrap();
         match self {

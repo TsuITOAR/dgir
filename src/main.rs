@@ -1,14 +1,12 @@
 use std::time::Instant;
 
 use dgir::{
-    album::{Painting, Polygon},
+    color::{Color, LayerData, Shader},
     draw::{
-        self,
-        elements::{Rectangle, RulerFactory},
+        elements::{CircularArc, Rectangle, RulerFactory},
         Resolution,
     },
-    paint::LayerData,
-    units::{Angle, Deg},
+    units::{Angle, Deg, Rad},
     Cell, Lib, MICROMETER, NANOMETER,
 };
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -16,23 +14,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut lib = Lib::new("first_lib");
     let mut cell = Cell::new("first_alb");
     let layer = LayerData::new(1, 0);
-    let circle = draw::elements::Circle::new(
+    let arc = CircularArc::new(
         (MICROMETER * 0., MICROMETER * 0.),
         MICROMETER * 100.,
-        Resolution::MinNumber(5000),
-    );
-    cell.push(Painting::Polygon(Polygon {
-        polygon: circle.produce().draw(),
-        color: layer,
-    }));
+        (Rad::from_deg(0.), Rad::from_deg(180.)),
+        Resolution::MinNumber(300),
+    )
+    .produce()
+    .draw();
+    cell.push(layer.to_line().color(arc));
     let mut top_cell = Cell::new("sec_alb");
     top_cell.insert(cell.as_ref());
     let mut rec = Rectangle::<_, Deg<f64>>::from_lens(MICROMETER * 50., MICROMETER * 50.);
     rec.rotate(Deg::<f64>::from_deg(19.));
-    top_cell.push(Painting::Polygon(Polygon {
-        polygon: rec.produce().draw(),
-        color: layer,
-    }));
+    top_cell.push(layer.to_filler().color(rec.produce().draw()));
     lib.push(top_cell);
     let user_unit = MICROMETER;
     let db_unit = NANOMETER;
