@@ -22,7 +22,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )
     .produce()
     .draw();
-    cell.push(layer.to_line().color(arc));
+    cell.push(layer.to_brush(MICROMETER).color(arc));
     let mut top_cell = Cell::new("sec_alb");
     top_cell.insert(cell.as_ref());
     let mut rec = Rectangle::<_, Deg<f64>>::from_lens(MICROMETER * 50., MICROMETER * 50.);

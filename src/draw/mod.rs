@@ -64,7 +64,7 @@ impl<In: 'static + Copy, Out: 'static> Ruler<In, Out> {
             self.list.map(move |p| Coordinate::from([x(p), y(p)])),
         ))
     }
-    pub fn decorate(self, decorator: Box<dyn FnMut(In) -> In>) -> Self {
+    pub fn decorate(self, decorator: impl FnMut(In) -> In + 'static) -> Self {
         Self::new(Box::new(self.list.map(decorator)), self.x, self.y)
     }
 }

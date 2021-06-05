@@ -1,6 +1,6 @@
 use crate::{
     album::{Painting, Path, Polygon},
-    draw::{Distance, Drawing, Ruler},
+    draw::{Distance, Drawing},
 };
 
 #[derive(Clone, Copy, Debug, Default)]
