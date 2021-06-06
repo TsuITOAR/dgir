@@ -1,23 +1,142 @@
-use std::{
-    iter::{once, successors},
-    ops::Add,
-};
+use std::{iter::successors, ops::Add};
 
 use num::{traits::FloatConst, Float, FromPrimitive, ToPrimitive, Zero};
 
-use crate::{
-    draw::Resolution,
-    units::{Angle, Deg},
-};
+use crate::{draw::Resolution, units::Angle};
 
-use super::{Distance, Ruler};
+use super::{Coordinate, Distance, Ruler};
 
 pub trait RulerFactory {
     type In: 'static;
     type Out: 'static + Distance;
     fn produce(self) -> Ruler<Self::In, Self::Out>;
+    fn reverse(self) -> Ruler<Self::In, Self::Out>;
 }
 
+#[derive(Debug, Clone)]
+pub struct Compound<R1, R2> {
+    r1: R1,
+    r2: R2,
+}
+
+impl<R1, R2> Compound<R1, R2> {
+    pub fn new(r1: R1, r2: R2) -> Self {
+        Self { r1, r2 }
+    }
+}
+
+impl<R1, R2> RulerFactory for Compound<R1, R2>
+where
+    R1: RulerFactory,
+    R1::In: Copy,
+    R2: RulerFactory<In = R1::In, Out = R1::Out>,
+{
+    type In = (R1::In, bool);
+    type Out = R1::Out;
+    fn produce(self) -> Ruler<Self::In, Self::Out> {
+        let Ruler {
+            para_list: list1,
+            para_equ: mut equ1,
+        } = self.r1.produce();
+        let Ruler {
+            para_list: list2,
+            para_equ: mut equ2,
+        } = self.r2.reverse();
+        let list = CompoundIter::new(list1, list2);
+        let para_equ = move |input: Self::In| {
+            let para = input.0;
+            match input.1 {
+                true => equ1(para),
+                false => equ2(para),
+            }
+        };
+        Ruler::new(list, para_equ)
+    }
+    fn reverse(self) -> Ruler<Self::In, Self::Out> {
+        let Ruler {
+            para_list: list1,
+            para_equ: mut equ1,
+        } = self.r1.reverse();
+        let Ruler {
+            para_list: list2,
+            para_equ: mut equ2,
+        } = self.r2.produce();
+        let list = CompoundIter::new(list2, list1);
+        let para_equ = move |input: Self::In| {
+            let para = input.0;
+            match input.1 {
+                true => equ2(para),
+                false => equ1(para),
+            }
+        };
+        Ruler::new(list, para_equ)
+    }
+}
+
+struct CompoundIter<I1, I2> {
+    stage1: I1,
+    stage2: I2,
+    flag: bool,
+}
+
+impl<I1, I2> CompoundIter<I1, I2> {
+    fn new(stage1: I1, stage2: I2) -> Self {
+        Self {
+            stage1,
+            stage2,
+            flag: true,
+        }
+    }
+}
+
+impl<I1, I2> Iterator for CompoundIter<I1, I2>
+where
+    I1: Iterator,
+    I2: Iterator<Item = I1::Item>,
+{
+    type Item = (I1::Item, bool);
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.flag {
+            true => {
+                if let Some(v) = self.stage1.next() {
+                    Some((v, self.flag))
+                } else {
+                    self.flag = false;
+                    if let Some(v) = self.stage2.next() {
+                        Some((v, self.flag))
+                    } else {
+                        None
+                    }
+                }
+            }
+            false => {
+                if let Some(v) = self.stage2.next() {
+                    Some((v, self.flag))
+                } else {
+                    None
+                }
+            }
+        }
+    }
+}
+
+pub trait Offset: Sized {
+    type Field: Add<Self::Field, Output = Self::Field> + Copy;
+    fn field(&mut self) -> &mut Self::Field;
+    fn offset(mut self, change: Self::Field) -> Self {
+        *self.field() = *self.field() + change;
+        self
+    }
+    fn into_compound(self, offsets: (Self::Field, Self::Field)) -> Compound<Self, Self>
+    where
+        Self: RulerFactory + Clone,
+    {
+        let s1 = self.clone();
+        Compound::new(self.offset(offsets.0), s1.offset(offsets.1))
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
 pub struct Circle<S> {
     center: (S, S),
     radius: S,
@@ -44,7 +163,7 @@ where
     fn produce(self) -> Ruler<Self::In, Self::Out> {
         let two_pi = <Self::In as FloatConst>::PI() + <Self::In as FloatConst>::PI();
         let step_num = match self.resolution {
-            Resolution::MinNumber(n) => n,
+            Resolution::MinNumber(n) => n - 1,
             Resolution::MinDistance(d) => (two_pi * (self.radius / d).abs()).to_usize().unwrap(),
         };
         let ang_step =
@@ -52,107 +171,123 @@ where
         let list = successors(Some(<Self::In as Zero>::zero()), move |ang| {
             Some(*ang + ang_step)
         })
-        .take(step_num)
-        .chain(once(<Self::In as Zero>::zero()));
+        .take(step_num + 1);
         let radius = self.radius;
         let center = self.center;
         let x = move |ang: Self::In| center.0 + radius * ang.cos();
         let y = move |ang: Self::In| center.1 + radius * ang.sin();
-        Ruler::new(list, x, y)
+        let para_equ = move |ang: Self::In| Coordinate::from([x(ang), y(ang)]);
+        Ruler::new(list, para_equ)
+    }
+    fn reverse(self) -> Ruler<Self::In, Self::Out> {
+        self.produce()
     }
 }
 
-pub struct Rectangle<S: Copy, A: Angle + Copy = Deg<S>> {
-    point1: (S, S),
-    point2: (S, S),
-    angle: Option<A>,
+impl<S> Offset for Circle<S>
+where
+    S: Copy + Add<Output = S>,
+{
+    type Field = S;
+    fn field(&mut self) -> &mut Self::Field {
+        &mut self.radius
+    }
 }
 
-impl<S: Copy, A: Angle + Copy> Rectangle<S, A> {
-    pub fn from_points(point1: (S, S), point2: (S, S)) -> Self {
-        Self {
-            point1,
-            point2,
-            angle: None,
-        }
-    }
-    pub fn from_lens(x: S, y: S) -> Self
+#[derive(Debug, Clone, Copy)]
+pub struct Rectangle<S: Copy> {
+    x: S,
+    y: S,
+}
+
+impl<S: Copy> Rectangle<S> {
+    pub fn new(x: S, y: S) -> Self
     where
         S: Distance,
     {
-        Self {
-            point1: (
-                x * <S as Distance>::Basic::from_f64(-0.5).unwrap(),
-                y * <S as Distance>::Basic::from_f64(-0.5).unwrap(),
-            ),
-            point2: (
-                x * <S as Distance>::Basic::from_f64(0.5).unwrap(),
-                y * <S as Distance>::Basic::from_f64(0.5).unwrap(),
-            ),
-            angle: None,
-        }
-    }
-    pub fn rotate<U: Into<A>>(&mut self, angle: U)
-    where
-        A: Add<Output = A>,
-    {
-        match self.angle {
-            Some(ref mut a) => *a = a.clone() + angle.into(),
-            None => self.angle = Some(angle.into()),
-        }
+        Self { x, y }
     }
 }
 
-impl<S, A> RulerFactory for Rectangle<S, A>
+impl<S> RulerFactory for Rectangle<S>
 where
     S: 'static + Distance + Copy,
-    <S as Distance>::Basic: FloatConst + Float + ToPrimitive + FromPrimitive,
-    A: 'static + Angle<Basic = <S as Distance>::Basic> + Copy,
+    S::Basic: FloatConst + Float + ToPrimitive + FromPrimitive,
 {
     type In = (S, S);
     type Out = S;
     fn produce(self) -> Ruler<Self::In, Self::Out> {
         let points = vec![
-            (self.point1.0, self.point1.1),
-            (self.point2.0, self.point1.1),
-            (self.point2.0, self.point2.1),
-            (self.point1.0, self.point2.1),
-            (self.point1.0, self.point1.1),
+            (
+                self.x * S::Basic::from_f64(-0.5).unwrap(),
+                self.y * S::Basic::from_f64(-0.5).unwrap(),
+            ),
+            (
+                self.x * S::Basic::from_f64(0.5).unwrap(),
+                self.y * S::Basic::from_f64(-0.5).unwrap(),
+            ),
+            (
+                self.x * S::Basic::from_f64(0.5).unwrap(),
+                self.y * S::Basic::from_f64(0.5).unwrap(),
+            ),
+            (
+                self.x * S::Basic::from_f64(-0.5).unwrap(),
+                self.y * S::Basic::from_f64(0.5).unwrap(),
+            ),
+            (
+                self.x * S::Basic::from_f64(-0.5).unwrap(),
+                self.y * S::Basic::from_f64(-0.5).unwrap(),
+            ),
         ];
-        let (x, y): (
-            Box<dyn FnMut(Self::In) -> Self::Out>,
-            Box<dyn FnMut(Self::In) -> Self::Out>,
-        ) = match self.angle {
-            Some(a) => (
-                Box::new(move |point: (S, S)| {
-                    point.0 * a.to_rad().cos() - point.1 * a.to_rad().sin()
-                }),
-                Box::new(move |point: (S, S)| {
-                    point.0 * a.to_rad().sin() + point.1 * a.to_rad().cos()
-                }),
+        let para_equ = move |point: Self::In| Coordinate::from([point.0, point.1]);
+        Ruler::new(points.into_iter(), para_equ)
+    }
+    fn reverse(self) -> Ruler<Self::In, Self::Out> {
+        let points = vec![
+            (
+                self.x * S::Basic::from_f64(-0.5).unwrap(),
+                self.y * S::Basic::from_f64(-0.5).unwrap(),
             ),
-            None => (
-                Box::new(move |point: (S, S)| point.0),
-                Box::new(move |point: (S, S)| point.1),
+            (
+                self.x * S::Basic::from_f64(0.5).unwrap(),
+                self.y * S::Basic::from_f64(-0.5).unwrap(),
             ),
-        };
-        Ruler {
-            list: Box::new(points.into_iter()),
-            x,
-            y,
-        }
+            (
+                self.x * S::Basic::from_f64(0.5).unwrap(),
+                self.y * S::Basic::from_f64(0.5).unwrap(),
+            ),
+            (
+                self.x * S::Basic::from_f64(-0.5).unwrap(),
+                self.y * S::Basic::from_f64(0.5).unwrap(),
+            ),
+            (
+                self.x * S::Basic::from_f64(-0.5).unwrap(),
+                self.y * S::Basic::from_f64(-0.5).unwrap(),
+            ),
+        ];
+        let para_equ = move |point: Self::In| Coordinate::from([point.0, point.1]);
+        Ruler::new(points.into_iter().rev(), para_equ)
     }
 }
 
+#[derive(Debug, Clone, Copy)]
 pub struct CircularArc<S, A> {
     center: (S, S),
     radius: S,
-    angle: (A, A),
+    angle: (Angle<A>, Angle<A>),
     resolution: Resolution<S>,
 }
 
-impl<S, A> CircularArc<S, A> {
-    pub fn new(center: (S, S), radius: S, angle: (A, A), resolution: Resolution<S>) -> Self {
+impl<S> CircularArc<S, S::Basic>
+where
+    S: Distance,
+{
+    pub fn new(
+        center: (S, S),
+        radius: S,
+        angle: (Angle<S::Basic>, Angle<S::Basic>),
+        resolution: Resolution<S>,
+    ) -> Self {
         Self {
             center,
             radius,
@@ -162,11 +297,10 @@ impl<S, A> CircularArc<S, A> {
     }
 }
 
-impl<S, A> RulerFactory for CircularArc<S, A>
+impl<S> RulerFactory for CircularArc<S, S::Basic>
 where
     S: 'static + Distance + Copy,
     <S as Distance>::Basic: FloatConst + Float + ToPrimitive + FromPrimitive,
-    A: 'static + Angle<Basic = <S as Distance>::Basic> + Copy,
 {
     type In = <S as Distance>::Basic;
     type Out = S;
@@ -174,18 +308,49 @@ where
         let (rad1, rad2) = (self.angle.0.to_rad(), self.angle.1.to_rad());
         let diff_angle = rad2 - rad1;
         let step_num = match self.resolution {
-            Resolution::MinNumber(n) => n,
+            Resolution::MinNumber(n) => n - 1,
             Resolution::MinDistance(d) => {
                 ((diff_angle * (self.radius / d)).abs()).to_usize().unwrap()
             }
         };
         let ang_step =
             diff_angle / <<S as Distance>::Basic as FromPrimitive>::from_usize(step_num).unwrap();
-        let list = successors(Some(rad1), move |ang| Some(*ang + ang_step)).take(step_num);
+        let list = successors(Some(rad1), move |ang| Some(*ang + ang_step)).take(step_num + 1);
         let radius = self.radius;
         let center = self.center;
         let x = move |ang: Self::In| center.0 + radius * ang.cos();
         let y = move |ang: Self::In| center.1 + radius * ang.sin();
-        Ruler::new(list, x, y)
+        let para_equ = move |ang: Self::In| Coordinate::from([x(ang), y(ang)]);
+        Ruler::new(list, para_equ)
+    }
+    fn reverse(self) -> Ruler<Self::In, Self::Out> {
+        let (rad2, rad1) = (self.angle.0.to_rad(), self.angle.1.to_rad());
+        let diff_angle = rad2 - rad1;
+        let step_num = match self.resolution {
+            Resolution::MinNumber(n) => n - 1,
+            Resolution::MinDistance(d) => {
+                ((diff_angle * (self.radius / d)).abs()).to_usize().unwrap()
+            }
+        };
+        let ang_step =
+            diff_angle / <<S as Distance>::Basic as FromPrimitive>::from_usize(step_num).unwrap();
+        let list = successors(Some(rad1), move |ang| Some(*ang + ang_step)).take(step_num + 1);
+        let radius = self.radius;
+        let center = self.center;
+        let x = move |ang: Self::In| center.0 + radius * ang.cos();
+        let y = move |ang: Self::In| center.1 + radius * ang.sin();
+        let para_equ = move |ang: Self::In| Coordinate::from([x(ang), y(ang)]);
+        Ruler::new(list, para_equ)
+    }
+}
+
+impl<S> Offset for CircularArc<S, S::Basic>
+where
+    S: 'static + Distance + Copy,
+    <S as Distance>::Basic: FloatConst + Float + ToPrimitive + FromPrimitive,
+{
+    type Field = S;
+    fn field(&mut self) -> &mut Self::Field {
+        &mut self.radius
     }
 }

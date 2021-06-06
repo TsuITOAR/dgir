@@ -1,10 +1,11 @@
 use core::f64;
 use std::{
     marker::PhantomData,
-    ops::{Add, Div, Mul, Sub},
+    ops::{Add, Div, Mul, Neg, Sub},
 };
 
-use num::{traits::FloatConst, Float, FromPrimitive, Num, ToPrimitive, Zero};
+use num::{traits::FloatConst, FromPrimitive, Num, Zero};
+
 pub trait AbsoluteUnit {
     const CONVERSION_FACTOR: f64;
 }
@@ -39,6 +40,15 @@ impl<S> Length<Relative, S> {
     {
         Length {
             value: value * S::from_f64(<U as RelativeUnit>::CONVERSION_FACTOR).unwrap(),
+            marker: PhantomData,
+        }
+    }
+}
+impl<T: LengthType, S: Neg<Output = S>> Neg for Length<T, S> {
+    type Output = Length<T, S>;
+    fn neg(self) -> Self::Output {
+        Length::<T, S> {
+            value: -self.value,
             marker: PhantomData,
         }
     }
@@ -160,103 +170,61 @@ pub struct Deg<S>(S);
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Rad<S>(S);
 
-pub trait Angle {
-    type Basic;
-    fn to_rad(self) -> Self::Basic;
-    fn to_deg(self) -> Self::Basic;
-    fn from_rad(rad: Self::Basic) -> Self;
-    fn from_deg(deg: Self::Basic) -> Self;
-}
-
-impl<S> Angle for Deg<S>
-where
-    S: FloatConst + Float + Zero + FromPrimitive + ToPrimitive,
-{
-    type Basic = S;
-    fn to_deg(self) -> Self::Basic {
+#[derive(Debug, Clone, Copy)]
+pub struct Angle<S>(S);
+impl<S> Angle<S> {
+    pub fn to_rad(self) -> S {
         self.0
     }
-    fn to_rad(self) -> Self::Basic {
-        self.0 / <Self::Basic as FromPrimitive>::from_f64(180.).unwrap()
-            * <Self::Basic as FloatConst>::PI()
+    pub fn to_deg(self) -> S
+    where
+        S: Num + FloatConst + FromPrimitive,
+    {
+        self.0 / S::PI() * S::from_f64(180.).unwrap()
     }
-    fn from_deg(deg: Self::Basic) -> Self {
-        Self(deg)
-    }
-    fn from_rad(rad: Self::Basic) -> Self {
-        Self(
-            rad * <Self::Basic as FromPrimitive>::from_f64(180.).unwrap()
-                / <Self::Basic as FloatConst>::PI(),
-        )
-    }
-}
-
-impl<S> Angle for Rad<S>
-where
-    S: FloatConst + Float + Zero + FromPrimitive + ToPrimitive,
-{
-    type Basic = S;
-    fn to_deg(self) -> Self::Basic {
-        self.0 / <Self::Basic as FloatConst>::PI()
-            * <Self::Basic as FromPrimitive>::from_f64(180.).unwrap()
-    }
-    fn to_rad(self) -> Self::Basic {
-        self.0
-    }
-    fn from_deg(deg: Self::Basic) -> Self {
-        Self(
-            deg * <Self::Basic as FloatConst>::PI()
-                / <Self::Basic as FromPrimitive>::from_f64(180.).unwrap(),
-        )
-    }
-    fn from_rad(rad: Self::Basic) -> Self {
+    pub fn from_rad(rad: S) -> Self {
         Self(rad)
     }
-}
-
-impl<S> From<Rad<S>> for Deg<S>
-where
-    S: FloatConst + Float + Zero + FromPrimitive + ToPrimitive,
-{
-    fn from(rad: Rad<S>) -> Self {
-        Self(rad.to_deg())
+    pub fn from_deg(deg: S) -> Self
+    where
+        S: Num + FloatConst + FromPrimitive,
+    {
+        Self(deg / S::from_f64(180.).unwrap() * S::PI())
     }
 }
 
-impl<S> From<Deg<S>> for Rad<S>
-where
-    S: FloatConst + Float + Zero + FromPrimitive + ToPrimitive,
-{
-    fn from(deg: Deg<S>) -> Self {
-        Self(deg.to_rad())
+impl<S: Add<Output = S>> Add<Angle<S>> for Angle<S> {
+    type Output = Angle<S>;
+    fn add(self, rhs: Angle<S>) -> Self::Output {
+        Self(self.0 + rhs.0)
     }
 }
 
-impl<S: Add<Output = S>, T: Angle<Basic = S>> Add<T> for Rad<S> {
-    type Output = Rad<S>;
-    fn add(self, rhs: T) -> Self::Output {
-        Self(self.0 + rhs.to_rad())
+impl<S: Sub<Output = S>> Sub<Angle<S>> for Angle<S> {
+    type Output = Angle<S>;
+    fn sub(self, rhs: Angle<S>) -> Self::Output {
+        Self(self.0 - rhs.0)
     }
 }
 
-impl<S: Add<Output = S>, T: Angle<Basic = S>> Add<T> for Deg<S> {
-    type Output = Deg<S>;
-    fn add(self, rhs: T) -> Self::Output {
-        Self(self.0 + rhs.to_deg())
+impl<S: Mul<Output = S>> Mul<S> for Angle<S> {
+    type Output = Angle<S>;
+    fn mul(self, rhs: S) -> Self::Output {
+        Angle::<S>(self.0 * rhs)
     }
 }
 
-impl<S: Sub<Output = S>, T: Angle<Basic = S>> Sub<T> for Rad<S> {
-    type Output = Rad<S>;
-    fn sub(self, rhs: T) -> Self::Output {
-        Self(self.0 - rhs.to_rad())
+impl<S: Div<Output = S>> Div<S> for Angle<S> {
+    type Output = Angle<S>;
+    fn div(self, rhs: S) -> Self::Output {
+        Angle::<S>(self.0 / rhs)
     }
 }
 
-impl<S: Sub<Output = S>, T: Angle<Basic = S>> Sub<T> for Deg<S> {
-    type Output = Deg<S>;
-    fn sub(self, rhs: T) -> Self::Output {
-        Self(self.0 - rhs.to_deg())
+impl<S: Neg<Output = S>> Neg for Angle<S> {
+    type Output = Angle<S>;
+    fn neg(self) -> Self::Output {
+        Angle::<S>(-self.0)
     }
 }
 

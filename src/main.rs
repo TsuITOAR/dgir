@@ -3,10 +3,10 @@ use std::time::Instant;
 use dgir::{
     color::{Color, LayerData, Shader},
     draw::{
-        elements::{CircularArc, Rectangle, RulerFactory},
+        elements::{CircularArc, Offset, Rectangle, RulerFactory},
         Resolution,
     },
-    units::{Angle, Deg, Rad},
+    units::Angle,
     Cell, Lib, MICROMETER, NANOMETER,
 };
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -17,17 +17,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let arc = CircularArc::new(
         (MICROMETER * 0., MICROMETER * 0.),
         MICROMETER * 100.,
-        (Rad::from_deg(0.), Rad::from_deg(180.)),
-        Resolution::MinNumber(300),
+        (Angle::from_deg(0.), Angle::from_deg(360.)),
+        Resolution::MinNumber(2000),
     )
+    .into_compound((MICROMETER, -MICROMETER))
     .produce()
     .draw();
-    cell.push(layer.to_brush(MICROMETER).color(arc));
+    cell.push(layer.to_filler().color(arc));
     let mut top_cell = Cell::new("sec_alb");
     top_cell.insert(cell.as_ref());
-    let mut rec = Rectangle::<_, Deg<f64>>::from_lens(MICROMETER * 50., MICROMETER * 50.);
-    rec.rotate(Deg::<f64>::from_deg(19.));
-    top_cell.push(layer.to_filler().color(rec.produce().draw()));
+    let rec = Rectangle::new(MICROMETER * 50., MICROMETER * 50.)
+        .produce()
+        .rotate(Angle::from_deg(30.))
+        .move_evenly(MICROMETER * 10., MICROMETER * 30.);
+    top_cell.push(layer.to_filler().color(rec.draw()));
     lib.push(top_cell);
     let user_unit = MICROMETER;
     let db_unit = NANOMETER;

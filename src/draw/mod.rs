@@ -1,26 +1,20 @@
 use std::ops::{Add, Div, Mul, Sub};
 
-use crate::units::{Absolute, Length, Meter};
+use crate::units::{Absolute, Angle, Length, Meter};
 use arrayvec::ArrayVec;
-use num::{FromPrimitive, Num, ToPrimitive, Zero};
+use num::{Float, FromPrimitive, Num, ToPrimitive, Zero};
 
 pub mod elements;
 
 //TO-DO:This actually cost more time for little file, need to figure out
 pub(crate) type Coordinate<T> = ArrayVec<T, 2>;
+
+#[derive(Debug, Clone, Copy)]
 pub enum Resolution<T> {
     MinDistance(T),
     MinNumber(usize),
 }
-/* pub trait Convert<T> {
-    fn convert(self) -> T;
-}
 
-impl<U: LengthType<S>, V: LengthType<S>, S: Num + Copy> Convert<MakeLength<V, S>> for MakeLength<U, S> {
-    fn convert(self) -> MakeLength<V, S> {
-        self.conversion()
-    }
-} */
 pub trait Distance:
     Sized
     + Add<Self, Output = Self>
@@ -29,43 +23,66 @@ pub trait Distance:
     + Div<Self, Output = Self::Basic>
     + Zero
 {
-    type Basic: Num + Sized + Copy + ToPrimitive + FromPrimitive;
+    type Basic: Num + Float + Sized + Copy + ToPrimitive + FromPrimitive;
     fn from(meter: f64) -> Self;
 }
 
-impl<S: Num + Copy + ToPrimitive + FromPrimitive> Distance for Length<Absolute, S> {
+impl<S: Num + Copy + Float + ToPrimitive + FromPrimitive> Distance for Length<Absolute, S> {
     type Basic = S;
     fn from(meter: f64) -> Self {
         Length::new_absolute::<Meter>(S::from_f64(meter).unwrap())
     }
 }
 pub struct Ruler<In: 'static, Out: 'static> {
-    list: Box<dyn Iterator<Item = In>>,
-    x: Box<dyn FnMut(In) -> Out>,
-    y: Box<dyn FnMut(In) -> Out>,
+    para_list: Box<dyn Iterator<Item = In>>,
+    para_equ: Box<dyn FnMut(In) -> Coordinate<Out>>,
 }
 
 impl<In: 'static + Copy, Out: 'static> Ruler<In, Out> {
     pub fn new(
         list: impl Iterator<Item = In> + 'static,
-        x: impl FnMut(In) -> Out + 'static,
-        y: impl FnMut(In) -> Out + 'static,
+        para_equ: impl FnMut(In) -> Coordinate<Out> + 'static,
     ) -> Self {
         Self {
-            list: Box::new(list),
-            x: Box::new(x),
-            y: Box::new(y),
+            para_list: Box::new(list),
+            para_equ: Box::new(para_equ),
         }
     }
     pub fn draw(self) -> Drawing<Out> {
-        let mut x = self.x;
-        let mut y = self.y;
-        Drawing::Iter(Box::new(
-            self.list.map(move |p| Coordinate::from([x(p), y(p)])),
-        ))
+        let para_equ = self.para_equ;
+        Drawing::Iter(Box::new(self.para_list.map(para_equ)))
     }
-    pub fn decorate(self, decorator: impl FnMut(In) -> In + 'static) -> Self {
-        Self::new(Box::new(self.list.map(decorator)), self.x, self.y)
+    pub fn decorate_input(mut self, decorator: impl FnMut(In) -> In + 'static) -> Self {
+        self.para_list = Box::new(self.para_list.map(decorator));
+        self
+    }
+    pub fn decorate_output(
+        mut self,
+        mut decorator: impl FnMut(Coordinate<Out>) -> Coordinate<Out> + 'static,
+    ) -> Self {
+        let mut para_equ = self.para_equ;
+        self.para_equ = Box::new(move |coordinate| decorator(para_equ(coordinate)));
+        self
+    }
+    pub fn rotate(self, angle: Angle<Out::Basic>) -> Self
+    where
+        Out: Distance + Copy,
+    {
+        let decorator = move |input: Coordinate<Out>| {
+            Coordinate::from([
+                input[0] * angle.to_rad().cos() - input[1] * angle.to_rad().sin(),
+                input[0] * angle.to_rad().sin() + input[1] * angle.to_rad().cos(),
+            ])
+        };
+        self.decorate_output(decorator)
+    }
+    pub fn move_evenly(self, x: Out, y: Out) -> Self
+    where
+        Out: Distance + Copy,
+    {
+        let decorator =
+            move |input: Coordinate<Out>| Coordinate::from([input[0] + x, input[1] + y]);
+        self.decorate_output(decorator)
     }
 }
 pub enum Drawing<T> {
@@ -75,9 +92,33 @@ pub enum Drawing<T> {
 impl<T: Distance + Clone> Drawing<T> {
     pub(crate) fn to_xy(self, database_length: T) -> Vec<i32> {
         let convert = |x: T| (x / database_length.clone()).to_i32().unwrap();
-        match self {
+        let ret: Vec<i32> = match self {
             Drawing::Iter(iter) => iter.flatten().map(convert).collect(),
             Drawing::Points(points) => points.into_iter().flatten().map(convert).collect(),
-        }
+        };
+        ret
+    }
+
+    pub fn connect(self, other: Self) -> Self
+    where
+        T: 'static,
+    {
+        Drawing::Iter(match (self, other) {
+            (Drawing::Iter(s), Drawing::Iter(o)) => Box::new(s.chain(o)),
+            (Drawing::Iter(s), Drawing::Points(o)) => Box::new(s.chain(o.into_iter())),
+            (Drawing::Points(s), Drawing::Iter(o)) => Box::new(s.into_iter().chain(o)),
+            (Drawing::Points(s), Drawing::Points(o)) => {
+                Box::new(s.into_iter().chain(o.into_iter()))
+            }
+        })
+    }
+    pub fn reverse(self) -> Self
+    where
+        T: 'static,
+    {
+        Drawing::Iter(Box::new(match self {
+            Drawing::Iter(it) => it.collect::<Vec<Coordinate<T>>>().into_iter().rev(),
+            Drawing::Points(p) => p.into_iter().rev(),
+        }))
     }
 }

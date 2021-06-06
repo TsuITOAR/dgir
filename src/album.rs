@@ -7,8 +7,10 @@ use std::{
 use num::{FromPrimitive, ToPrimitive};
 
 use crate::{
+    close_curve,
     color::LayerData,
     draw::{Coordinate, Distance, Drawing},
+    points_num_check,
 };
 
 pub struct Path<T: Distance> {
@@ -157,21 +159,30 @@ impl<T: Distance> Album<T> {
         let mut new_cell = GdsStruct::new(self.name);
         for painting in self.paintings {
             new_cell.elems.push(match painting {
-                Painting::Path(p) => GdsElement::GdsPath(GdsPath {
-                    layer: p.color.layer,
-                    datatype: p.color.datatype,
-                    xy: p.coordinates.to_xy(database_unit),
-                    width: match p.width {
-                        Some(l) => (l / database_unit).to_i32(),
-                        None => None,
-                    },
-                    ..Default::default()
+                Painting::Path(p) => GdsElement::GdsPath({
+                    let xy = p.coordinates.to_xy(database_unit);
+                    points_num_check(&xy);
+                    GdsPath {
+                        layer: p.color.layer,
+                        datatype: p.color.datatype,
+                        xy,
+                        width: match p.width {
+                            Some(l) => (l / database_unit).to_i32(),
+                            None => None,
+                        },
+                        ..Default::default()
+                    }
                 }),
-                Painting::Polygon(p) => GdsElement::GdsBoundary(GdsBoundary {
-                    layer: p.color.layer,
-                    datatype: p.color.datatype,
-                    xy: p.coordinates.to_xy(database_unit),
-                    ..Default::default()
+                Painting::Polygon(p) => GdsElement::GdsBoundary({
+                    let mut xy = p.coordinates.to_xy(database_unit);
+                    close_curve(&mut xy);
+                    points_num_check(&xy);
+                    GdsBoundary {
+                        layer: p.color.layer,
+                        datatype: p.color.datatype,
+                        xy,
+                        ..Default::default()
+                    }
                 }),
                 Painting::Ref(r) => GdsElement::GdsStructRef(GdsStructRef {
                     name: r.reference,
