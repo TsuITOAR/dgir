@@ -4,44 +4,47 @@ use num::{traits::FloatConst, Float, FromPrimitive, ToPrimitive, Zero};
 
 use crate::{draw::Resolution, units::Angle};
 
-use super::{Coordinate, Distance, Ruler};
+use super::{Broaden, Coordinate, Curve, Distance, Offset};
 
-pub trait RulerFactory {
+pub trait IntoCurve {
     type In: 'static;
     type Out: 'static + Distance;
-    fn produce(self) -> Ruler<Self::In, Self::Out>;
-    fn reverse(self) -> Ruler<Self::In, Self::Out>;
+    fn forward(self) -> Curve<Self::In, Self::Out>;
+    fn backward(self) -> Curve<Self::In, Self::Out>;
 }
 
 #[derive(Debug, Clone)]
 pub struct Compound<R1, R2> {
-    r1: R1,
-    r2: R2,
+    forward: R1,
+    backward: R2,
 }
 
 impl<R1, R2> Compound<R1, R2> {
-    pub fn new(r1: R1, r2: R2) -> Self {
-        Self { r1, r2 }
+    pub fn new(forward: R1, backward: R2) -> Self {
+        Self { forward, backward }
+    }
+    pub fn compound_with<R3>(self, other: R3) -> Compound<Self, R3> {
+        Compound::<Self, R3>::new(self, other)
     }
 }
 
-impl<R1, R2> RulerFactory for Compound<R1, R2>
+impl<R1, R2> IntoCurve for Compound<R1, R2>
 where
-    R1: RulerFactory,
+    R1: IntoCurve,
     R1::In: Copy,
-    R2: RulerFactory<In = R1::In, Out = R1::Out>,
+    R2: IntoCurve<In = R1::In, Out = R1::Out>,
 {
     type In = (R1::In, bool);
     type Out = R1::Out;
-    fn produce(self) -> Ruler<Self::In, Self::Out> {
-        let Ruler {
+    fn forward(self) -> Curve<Self::In, Self::Out> {
+        let Curve {
             para_list: list1,
             para_equ: mut equ1,
-        } = self.r1.produce();
-        let Ruler {
+        } = self.forward.forward();
+        let Curve {
             para_list: list2,
             para_equ: mut equ2,
-        } = self.r2.reverse();
+        } = self.backward.backward();
         let list = CompoundIter::new(list1, list2);
         let para_equ = move |input: Self::In| {
             let para = input.0;
@@ -50,17 +53,17 @@ where
                 false => equ2(para),
             }
         };
-        Ruler::new(list, para_equ)
+        Curve::new(list, para_equ)
     }
-    fn reverse(self) -> Ruler<Self::In, Self::Out> {
-        let Ruler {
+    fn backward(self) -> Curve<Self::In, Self::Out> {
+        let Curve {
             para_list: list1,
             para_equ: mut equ1,
-        } = self.r1.reverse();
-        let Ruler {
+        } = self.forward.backward();
+        let Curve {
             para_list: list2,
             para_equ: mut equ2,
-        } = self.r2.produce();
+        } = self.backward.forward();
         let list = CompoundIter::new(list2, list1);
         let para_equ = move |input: Self::In| {
             let para = input.0;
@@ -69,7 +72,7 @@ where
                 false => equ1(para),
             }
         };
-        Ruler::new(list, para_equ)
+        Curve::new(list, para_equ)
     }
 }
 
@@ -120,21 +123,7 @@ where
     }
 }
 
-pub trait Offset: Sized {
-    type Field: Add<Self::Field, Output = Self::Field> + Copy;
-    fn field(&mut self) -> &mut Self::Field;
-    fn offset(mut self, change: Self::Field) -> Self {
-        *self.field() = *self.field() + change;
-        self
-    }
-    fn into_compound(self, offsets: (Self::Field, Self::Field)) -> Compound<Self, Self>
-    where
-        Self: RulerFactory + Clone,
-    {
-        let s1 = self.clone();
-        Compound::new(self.offset(offsets.0), s1.offset(offsets.1))
-    }
-}
+
 
 #[derive(Debug, Clone, Copy)]
 pub struct Circle<S> {
@@ -153,14 +142,14 @@ impl<S> Circle<S> {
     }
 }
 
-impl<S> RulerFactory for Circle<S>
+impl<S> IntoCurve for Circle<S>
 where
     S: 'static + Distance + Copy,
     <S as Distance>::Basic: FloatConst + Float + ToPrimitive + FromPrimitive,
 {
     type In = <S as Distance>::Basic;
     type Out = S;
-    fn produce(self) -> Ruler<Self::In, Self::Out> {
+    fn forward(self) -> Curve<Self::In, Self::Out> {
         let two_pi = <Self::In as FloatConst>::PI() + <Self::In as FloatConst>::PI();
         let step_num = match self.resolution {
             Resolution::MinNumber(n) => n - 1,
@@ -177,10 +166,10 @@ where
         let x = move |ang: Self::In| center.0 + radius * ang.cos();
         let y = move |ang: Self::In| center.1 + radius * ang.sin();
         let para_equ = move |ang: Self::In| Coordinate::from([x(ang), y(ang)]);
-        Ruler::new(list, para_equ)
+        Curve::new(list, para_equ)
     }
-    fn reverse(self) -> Ruler<Self::In, Self::Out> {
-        self.produce()
+    fn backward(self) -> Curve<Self::In, Self::Out> {
+        self.forward()
     }
 }
 
@@ -192,6 +181,11 @@ where
     fn field(&mut self) -> &mut Self::Field {
         &mut self.radius
     }
+}
+
+impl<S: Sized + Copy + Add<Output = S> + Distance + 'static> Broaden for Circle<S> where
+    S::Basic: FloatConst
+{
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -209,14 +203,14 @@ impl<S: Copy> Rectangle<S> {
     }
 }
 
-impl<S> RulerFactory for Rectangle<S>
+impl<S> IntoCurve for Rectangle<S>
 where
     S: 'static + Distance + Copy,
     S::Basic: FloatConst + Float + ToPrimitive + FromPrimitive,
 {
     type In = (S, S);
     type Out = S;
-    fn produce(self) -> Ruler<Self::In, Self::Out> {
+    fn forward(self) -> Curve<Self::In, Self::Out> {
         let points = vec![
             (
                 self.x * S::Basic::from_f64(-0.5).unwrap(),
@@ -240,9 +234,9 @@ where
             ),
         ];
         let para_equ = move |point: Self::In| Coordinate::from([point.0, point.1]);
-        Ruler::new(points.into_iter(), para_equ)
+        Curve::new(points.into_iter(), para_equ)
     }
-    fn reverse(self) -> Ruler<Self::In, Self::Out> {
+    fn backward(self) -> Curve<Self::In, Self::Out> {
         let points = vec![
             (
                 self.x * S::Basic::from_f64(-0.5).unwrap(),
@@ -266,7 +260,7 @@ where
             ),
         ];
         let para_equ = move |point: Self::In| Coordinate::from([point.0, point.1]);
-        Ruler::new(points.into_iter().rev(), para_equ)
+        Curve::new(points.into_iter().rev(), para_equ)
     }
 }
 
@@ -297,14 +291,14 @@ where
     }
 }
 
-impl<S> RulerFactory for CircularArc<S, S::Basic>
+impl<S> IntoCurve for CircularArc<S, S::Basic>
 where
     S: 'static + Distance + Copy,
     <S as Distance>::Basic: FloatConst + Float + ToPrimitive + FromPrimitive,
 {
     type In = <S as Distance>::Basic;
     type Out = S;
-    fn produce(self) -> Ruler<Self::In, Self::Out> {
+    fn forward(self) -> Curve<Self::In, Self::Out> {
         let (rad1, rad2) = (self.angle.0.to_rad(), self.angle.1.to_rad());
         let diff_angle = rad2 - rad1;
         let step_num = match self.resolution {
@@ -321,9 +315,9 @@ where
         let x = move |ang: Self::In| center.0 + radius * ang.cos();
         let y = move |ang: Self::In| center.1 + radius * ang.sin();
         let para_equ = move |ang: Self::In| Coordinate::from([x(ang), y(ang)]);
-        Ruler::new(list, para_equ)
+        Curve::new(list, para_equ)
     }
-    fn reverse(self) -> Ruler<Self::In, Self::Out> {
+    fn backward(self) -> Curve<Self::In, Self::Out> {
         let (rad2, rad1) = (self.angle.0.to_rad(), self.angle.1.to_rad());
         let diff_angle = rad2 - rad1;
         let step_num = match self.resolution {
@@ -340,7 +334,7 @@ where
         let x = move |ang: Self::In| center.0 + radius * ang.cos();
         let y = move |ang: Self::In| center.1 + radius * ang.sin();
         let para_equ = move |ang: Self::In| Coordinate::from([x(ang), y(ang)]);
-        Ruler::new(list, para_equ)
+        Curve::new(list, para_equ)
     }
 }
 
@@ -353,4 +347,9 @@ where
     fn field(&mut self) -> &mut Self::Field {
         &mut self.radius
     }
+}
+
+impl<S: Sized + Copy + Add<Output = S> + Distance + 'static> Broaden for CircularArc<S, S::Basic> where
+    S::Basic: FloatConst
+{
 }
