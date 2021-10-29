@@ -1,10 +1,10 @@
 use core::f64;
 use std::{
     marker::PhantomData,
-    ops::{Add, Div, Mul, Neg, Sub},
+    ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign},
 };
 
-use num::{traits::FloatConst, FromPrimitive, Num, Zero};
+use num::{traits::FloatConst, Float, FromPrimitive, Num, Zero};
 
 pub trait AbsoluteUnit {
     const CONVERSION_FACTOR: f64;
@@ -62,11 +62,23 @@ impl<T: LengthType, S: Num> Add<Length<T, S>> for Length<T, S> {
     }
 }
 
+impl<T: LengthType, S: AddAssign> AddAssign<Length<T, S>> for Length<T, S> {
+    fn add_assign(&mut self, rhs: Length<T, S>) {
+        self.value += rhs.value;
+    }
+}
+
 impl<T: LengthType, S: Num> Sub<Length<T, S>> for Length<T, S> {
     type Output = Length<T, S>;
     fn sub(mut self, rhs: Length<T, S>) -> Self::Output {
         self.value = self.value - rhs.value;
         self
+    }
+}
+
+impl<T: LengthType, S: SubAssign> SubAssign<Length<T, S>> for Length<T, S> {
+    fn sub_assign(&mut self, rhs: Length<T, S>) {
+        self.value -= rhs.value;
     }
 }
 
@@ -78,12 +90,19 @@ impl<T: LengthType, S: Num> Mul<S> for Length<T, S> {
     }
 }
 
+impl<T: LengthType, S: MulAssign> MulAssign<S> for Length<T, S> {
+    fn mul_assign(&mut self, rhs: S) {
+        self.value *= rhs;
+    }
+}
+
 impl<T: LengthType, S: Num> Div<Length<T, S>> for Length<T, S> {
     type Output = S;
     fn div(self, rhs: Length<T, S>) -> Self::Output {
         self.value / rhs.value
     }
 }
+
 impl<T: LengthType, S: Num> Div<S> for Length<T, S> {
     type Output = Length<T, S>;
     fn div(self, rhs: S) -> Self::Output {
@@ -91,6 +110,12 @@ impl<T: LengthType, S: Num> Div<S> for Length<T, S> {
             value: self.value / rhs,
             marker: self.marker,
         }
+    }
+}
+
+impl<T: LengthType, S: Num + DivAssign> DivAssign<S> for Length<T, S> {
+    fn div_assign(&mut self, rhs: S) {
+        self.value /= rhs;
     }
 }
 
@@ -126,6 +151,7 @@ pub struct Relative;
 pub trait LengthType {}
 impl LengthType for Absolute {}
 impl LengthType for Relative {}
+
 #[derive(Debug, Clone, Copy)]
 pub struct Nanometer;
 impl AbsoluteUnit for Nanometer {
@@ -170,7 +196,7 @@ pub struct Deg<S>(S);
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Rad<S>(S);
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord)]
 pub struct Angle<S>(S);
 impl<S> Angle<S> {
     pub fn to_rad(self) -> S {
@@ -190,6 +216,18 @@ impl<S> Angle<S> {
         S: Num + FloatConst + FromPrimitive,
     {
         Self(deg / S::from_f64(180.).unwrap() * S::PI())
+    }
+    pub fn cos(self) -> S
+    where
+        S: Float,
+    {
+        self.to_rad().cos()
+    }
+    pub fn sin(self) -> S
+    where
+        S: Float,
+    {
+        self.to_rad().sin()
     }
 }
 
@@ -238,4 +276,9 @@ fn units_operation() {
     assert_eq!(l3, (l1 + l2) * 500.);
     assert!(l1 < l3);
     assert_eq!(l1 / l2, 1.);
+    let deg = Angle::from_deg(180.);
+    let ang = Angle::from_rad(f64::PI());
+    assert_eq!(deg, ang);
+    assert_eq!(deg + ang, Angle::from_deg(360.));
+    assert_eq!(deg - ang, Angle::from_rad(0.));
 }

@@ -1,9 +1,10 @@
-use std::ops::{Add, Div, Mul, Sub};
+use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign};
 
 use crate::units::{Absolute, Angle, Length, Meter};
 use arrayvec::ArrayVec;
-use num::{Float, FromPrimitive, Num, ToPrimitive, Zero};
+use num::{traits::NumAssignOps, Float, FromPrimitive, Num, ToPrimitive, Zero};
 
+pub mod curve;
 pub mod elements;
 
 //TO-DO:This actually cost more time for little file, need to figure out
@@ -18,16 +19,22 @@ pub enum Resolution<T> {
 pub trait Distance:
     Sized
     + Add<Self, Output = Self>
+    + AddAssign
     + Sub<Self, Output = Self>
+    + SubAssign
     + Mul<Self::Basic, Output = Self>
+    + MulAssign<Self::Basic>
     + Div<Self, Output = Self::Basic>
+    + DivAssign<Self::Basic>
     + Zero
 {
-    type Basic: Num + Float + Sized + Copy + ToPrimitive + FromPrimitive;
+    type Basic: Num + NumAssignOps + Float + Sized + Copy + ToPrimitive + FromPrimitive;
     fn from(meter: f64) -> Self;
 }
 
-impl<S: Num + Copy + Float + ToPrimitive + FromPrimitive> Distance for Length<Absolute, S> {
+impl<S: Num + NumAssignOps + Copy + Float + ToPrimitive + FromPrimitive> Distance
+    for Length<Absolute, S>
+{
     type Basic = S;
     fn from(meter: f64) -> Self {
         Length::new_absolute::<Meter>(S::from_f64(meter).unwrap())

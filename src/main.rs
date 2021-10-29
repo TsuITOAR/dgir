@@ -18,7 +18,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         (MICROMETER * 0., MICROMETER * 0.),
         MICROMETER * 100.,
         (Angle::from_deg(0.), Angle::from_deg(360.)),
-        Resolution::MinNumber(2000),
+        Resolution::MinNumber(2001),
     )
     .into_compound((MICROMETER, -MICROMETER))
     .produce()
