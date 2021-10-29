@@ -5,6 +5,8 @@ use arrayvec::ArrayVec;
 use num::{traits::NumAssignOps, Float, FromPrimitive, Num, ToPrimitive, Zero};
 
 pub mod curve;
+use self::elements::{Compound, IntoCurve};
+
 pub mod elements;
 
 //TO-DO:This actually cost more time for little file, need to figure out
@@ -40,12 +42,12 @@ impl<S: Num + NumAssignOps + Copy + Float + ToPrimitive + FromPrimitive> Distanc
         Length::new_absolute::<Meter>(S::from_f64(meter).unwrap())
     }
 }
-pub struct Ruler<In: 'static, Out: 'static> {
+pub struct Curve<In: 'static, Out: 'static> {
     para_list: Box<dyn Iterator<Item = In>>,
     para_equ: Box<dyn FnMut(In) -> Coordinate<Out>>,
 }
 
-impl<In: 'static + Copy, Out: 'static> Ruler<In, Out> {
+impl<In: 'static + Copy, Out: 'static> Curve<In, Out> {
     pub fn new(
         list: impl Iterator<Item = In> + 'static,
         para_equ: impl FnMut(In) -> Coordinate<Out> + 'static,
@@ -128,4 +130,71 @@ impl<T: Distance + Clone> Drawing<T> {
             Drawing::Points(p) => p.into_iter().rev(),
         }))
     }
+}
+
+
+pub trait Offset: Sized {
+    type Field: Add<Self::Field, Output = Self::Field> + Copy;
+    fn field(&mut self) -> &mut Self::Field;
+    fn offset(mut self, change: Self::Field) -> Self {
+        *self.field() = *self.field() + change;
+        self
+    }
+    fn into_compound(self, offsets: (Self::Field, Self::Field)) -> Compound<Self, Self>
+    where
+        Self: IntoCurve + Clone,
+    {
+        let s1 = self.clone();
+        Compound::new(self.offset(offsets.0), s1.offset(offsets.1))
+    }
+}
+pub struct Broadened<C: IntoCurve + Broaden> {
+    curve: C,
+    width: C::Field,
+}
+
+impl<C: IntoCurve + Broaden> Broadened<C> {
+    fn new(curve: C, width: C::Field) -> Self {
+        Self { curve, width }
+    }
+}
+
+impl<C> IntoCurve for Broadened<C>
+where
+    C: IntoCurve + Broaden,
+    C::In: Copy,
+    C::Field: Distance,
+    <C::Field as Distance>::Basic: FromPrimitive,
+{
+    type In = (C::In, bool);
+    type Out = C::Out;
+    fn forward(self) -> Curve<Self::In, Self::Out> {
+        self.curve
+            .into_compound((
+                self.width * <C::Field as Distance>::Basic::from_f64(-0.5).unwrap(),
+                self.width * <C::Field as Distance>::Basic::from_f64(0.5).unwrap(),
+            ))
+            .forward()
+    }
+    fn backward(self) -> Curve<Self::In, Self::Out> {
+        self.curve
+            .into_compound((
+                self.width * <C::Field as Distance>::Basic::from_f64(-0.5).unwrap(),
+                self.width * <C::Field as Distance>::Basic::from_f64(0.5).unwrap(),
+            ))
+            .backward()
+    }
+}
+pub trait Broaden: Sized + Offset + IntoCurve + Clone {
+    fn set_width(self, width: Self::Field) -> Broadened<Self>
+    where
+        Self::Field: Distance,
+    {
+        Broadened::new(self, width)
+    }
+}
+
+pub struct Seed<S>{
+    core:S,
+    
 }

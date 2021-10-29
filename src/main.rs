@@ -1,14 +1,6 @@
 use std::time::Instant;
 
-use dgir::{
-    color::{Color, LayerData, Shader},
-    draw::{
-        elements::{CircularArc, Offset, Rectangle, RulerFactory},
-        Resolution,
-    },
-    units::Angle,
-    Cell, Lib, MICROMETER, NANOMETER,
-};
+use dgir::{Cell, Lib, MICROMETER, NANOMETER, color::{Color, LayerData, Shader}, draw::{Broaden, Resolution, elements::{CircularArc, IntoCurve, Rectangle}}, units::Angle};
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let start = Instant::now();
     let mut lib = Lib::new("first_lib");
@@ -20,14 +12,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         (Angle::from_deg(0.), Angle::from_deg(360.)),
         Resolution::MinNumber(2001),
     )
-    .into_compound((MICROMETER, -MICROMETER))
-    .produce()
+    .set_width(MICROMETER)
+    .forward()
     .draw();
     cell.push(layer.to_filler().color(arc));
     let mut top_cell = Cell::new("sec_alb");
     top_cell.insert(cell.as_ref());
     let rec = Rectangle::new(MICROMETER * 50., MICROMETER * 50.)
-        .produce()
+        .forward()
         .rotate(Angle::from_deg(30.))
         .move_evenly(MICROMETER * 10., MICROMETER * 30.);
     top_cell.push(layer.to_filler().color(rec.draw()));
