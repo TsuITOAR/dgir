@@ -56,9 +56,11 @@ impl<T: LengthType, S: Neg<Output = S>> Neg for Length<T, S> {
 
 impl<T: LengthType, S: Num> Add<Length<T, S>> for Length<T, S> {
     type Output = Length<T, S>;
-    fn add(mut self, rhs: Length<T, S>) -> Self::Output {
-        self.value = self.value + rhs.value;
-        self
+    fn add(self, rhs: Length<T, S>) -> Self::Output {
+        Self {
+            value: self.value + rhs.value,
+            marker: self.marker,
+        }
     }
 }
 
@@ -70,9 +72,11 @@ impl<T: LengthType, S: AddAssign> AddAssign<Length<T, S>> for Length<T, S> {
 
 impl<T: LengthType, S: Num> Sub<Length<T, S>> for Length<T, S> {
     type Output = Length<T, S>;
-    fn sub(mut self, rhs: Length<T, S>) -> Self::Output {
-        self.value = self.value - rhs.value;
-        self
+    fn sub(self, rhs: Length<T, S>) -> Self::Output {
+        Self {
+            value: self.value - rhs.value,
+            marker: self.marker,
+        }
     }
 }
 
@@ -84,9 +88,31 @@ impl<T: LengthType, S: SubAssign> SubAssign<Length<T, S>> for Length<T, S> {
 
 impl<T: LengthType, S: Num> Mul<S> for Length<T, S> {
     type Output = Length<T, S>;
-    fn mul(mut self, rhs: S) -> Self::Output {
-        self.value = self.value * rhs;
-        self
+    fn mul(self, rhs: S) -> Self::Output {
+        Self {
+            value: self.value * rhs,
+            marker: self.marker,
+        }
+    }
+}
+
+impl<T: LengthType> Mul<Length<T, f64>> for f64 {
+    type Output = Length<T, f64>;
+    fn mul(self, rhs: Length<T, f64>) -> Self::Output {
+        Self::Output {
+            value: self * rhs.value,
+            ..rhs
+        }
+    }
+}
+
+impl<T: LengthType> Mul<Length<T, f32>> for f32 {
+    type Output = Length<T, f32>;
+    fn mul(self, rhs: Length<T, f32>) -> Self::Output {
+        Self::Output {
+            value: self * rhs.value,
+            ..rhs
+        }
     }
 }
 
