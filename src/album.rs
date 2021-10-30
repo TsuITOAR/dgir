@@ -1,144 +1,145 @@
 use std::{
     collections::BTreeSet,
+    iter::Empty,
     ops::{Deref, DerefMut},
     rc::Rc,
 };
 
-use num::{FromPrimitive, ToPrimitive};
+use gds21::GdsPoint;
+use nalgebra::Scalar;
+use num::{FromPrimitive, Num, ToPrimitive};
 
 use crate::{
     close_curve,
     color::LayerData,
-    draw::{Coordinate, Distance, Drawing},
+    draw::coordinate::{Coordinate, LenCo},
     points_num_check,
+    units::{Absolute, Length, LengthType, Relative},
 };
 
-pub struct Path<T: Distance> {
-    pub coordinates: Drawing<T>,
+pub struct Path<L: LengthType, T: Num + Scalar> {
+    pub curve: Box<dyn Iterator<Item = LenCo<L, T>>>,
     pub color: LayerData,
-    pub width: Option<T>,
+    pub width: Option<Length<L, T>>,
 }
-impl<T: Distance + 'static> Path<T> {
-    pub fn to_painting(self) -> Painting<T>
+impl<L, T> Path<L, T>
+where
+    L: LengthType,
+    T: Num + Scalar,
+{
+    pub fn to_dgircell(self) -> Element<L, T>
     where
         T: Clone,
     {
-        Painting::Path(self)
+        Element::Path(self)
     }
 }
 
-pub struct Polygon<T: Distance> {
-    pub coordinates: Drawing<T>,
+pub struct Polygon<L: LengthType, T: Num + Scalar> {
+    pub area: Box<dyn Iterator<Item = LenCo<L, T>>>,
     pub color: LayerData,
 }
-impl<T: Distance + 'static> Polygon<T> {
-    pub fn to_painting(self) -> Painting<T>
+impl<L, T> Polygon<L, T>
+where
+    L: LengthType,
+    T: Num + Scalar,
+{
+    pub fn to_dgircell(self) -> Element<L, T>
     where
         T: Clone,
     {
-        Painting::Polygon(self)
+        Element::Polygon(self)
     }
 }
 
-pub struct Ref<T: Distance> {
+pub struct Ref<L, T>
+where
+    L: LengthType,
+    T: Num + Scalar,
+{
     pub(crate) decorator: Option<gds21::GdsStrans>,
-    pub(crate) position: Coordinate<T>,
+    pub(crate) position: Coordinate<Length<L, T>>,
     pub(crate) reference: String,
-    pub(crate) dependencies: Option<BTreeSet<Rc<Album<T>>>>,
+    pub(crate) dependencies: Option<BTreeSet<Rc<DgirCell<L, T>>>>,
 }
 
-impl<T: Distance> From<Album<T>> for Ref<T> {
-    fn from(mut album: Album<T>) -> Self {
-        let mut dependencies = BTreeSet::new();
-        for painting in album.paintings.iter_mut() {
-            match painting {
-                Painting::Ref(Ref {
-                    dependencies: Some(ref mut d),
-                    ..
-                }) => dependencies.append(d),
-                _ => (),
-            }
-        }
-        let album = Rc::new(album);
-        if !dependencies.insert(album.clone()) {
-            eprint!("circular references or duplicated names: {}", album.name);
-        }
-        Self {
-            decorator: None,
-            position: Coordinate::from([T::zero(), T::zero()]),
-            reference: album.name.clone(),
-            dependencies: Some(dependencies),
-        }
+pub enum Element<L, T>
+where
+    L: LengthType,
+    T: Num + Scalar,
+{
+    Path(Path<L, T>),
+    Polygon(Polygon<L, T>),
+    Ref(Ref<L, T>),
+}
+
+impl<L, T> From<Path<L, T>> for Element<L, T>
+where
+    L: LengthType,
+    T: Num + Scalar,
+{
+    fn from(p: Path<L, T>) -> Self {
+        Element::Path(p)
     }
 }
 
-impl<T: Distance> Ref<T> {
-    pub fn new(album: Album<T>) -> Self {
-        Self::from(album)
-    }
-    pub fn set_position(&mut self, position: Coordinate<T>) -> &mut Self {
-        self.position = position;
-        self
-    }
-    pub fn set_decorator(&mut self, strans: gds21::GdsStrans) -> &mut Self {
-        self.decorator = Some(strans);
-        self
-    }
-    pub fn decorator_mut(&mut self) -> &mut Option<gds21::GdsStrans> {
-        &mut self.decorator
-    }
-}
-pub enum Painting<T: Distance> {
-    Path(Path<T>),
-    Polygon(Polygon<T>),
-    Ref(Ref<T>),
-}
-
-impl<T: Distance> From<Path<T>> for Painting<T> {
-    fn from(p: Path<T>) -> Self {
-        Painting::Path(p)
+impl<L, T> From<Polygon<L, T>> for Element<L, T>
+where
+    L: LengthType,
+    T: Num + Scalar,
+{
+    fn from(p: Polygon<L, T>) -> Self {
+        Element::Polygon(p)
     }
 }
 
-impl<T: Distance> From<Polygon<T>> for Painting<T> {
-    fn from(p: Polygon<T>) -> Self {
-        Painting::Polygon(p)
+impl<L, T> From<Ref<L, T>> for Element<L, T>
+where
+    L: LengthType,
+    T: Num + Scalar,
+{
+    fn from(r: Ref<L, T>) -> Self {
+        Element::Ref(r)
     }
 }
-impl<T: Distance> From<Ref<T>> for Painting<T> {
-    fn from(r: Ref<T>) -> Self {
-        Painting::Ref(r)
-    }
-}
-pub struct Album<T: Distance> {
+pub struct DgirCell<L, T>
+where
+    L: LengthType,
+    T: Num + Scalar,
+{
     pub name: String,
-    pub(crate) paintings: Vec<Painting<T>>,
+    pub(crate) elements: Vec<Element<L, T>>,
 }
 
-impl<T: Distance> Album<T> {
+impl<L, T> DgirCell<L, T>
+where
+    L: LengthType,
+    T: Num + Scalar,
+{
     pub fn new(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
-            paintings: Vec::new(),
+            elements: Vec::new(),
         }
     }
     pub fn rename(&mut self, name: String) -> &mut Self {
         self.name = name;
         self
     }
-    pub fn insert<U: Into<Painting<T>>>(&mut self, painting: U) -> &mut Self {
-        self.push(painting.into());
+    pub fn insert<U: Into<Element<L, T>>>(&mut self, element: U) -> &mut Self {
+        self.elements.push(element.into());
         self
     }
 
-    pub fn as_ref(self) -> Ref<T> {
+    /* pub fn as_ref(self) -> Ref<L, T> {
         self.into()
-    }
-    pub fn get_dependencies(&mut self) -> BTreeSet<Rc<Album<T>>> {
+    } */
+
+    pub fn get_dependencies(&mut self) -> BTreeSet<Rc<DgirCell<L, T>>> {
         let mut dependencies = BTreeSet::new();
-        for painting in self.paintings.iter_mut() {
-            match painting {
-                Painting::Ref(Ref {
+        for element in self.elements.iter_mut() {
+            match element {
+                Element::Ref(Ref {
                     dependencies: Some(ref mut d),
                     ..
                 }) => {
@@ -149,18 +150,50 @@ impl<T: Distance> Album<T> {
         }
         dependencies
     }
+}
+trait ToGdsPoints: Iterator {
+    type Scale;
+    fn to_gdspoints(self, scale: Self::Scale) -> Vec<GdsPoint>;
+}
 
-    pub fn to_cell(self, database_unit: T) -> gds21::GdsStruct
-    where
-        T: Clone + Copy,
-        <T as Distance>::Basic: ToPrimitive + FromPrimitive,
-    {
+impl<I, T> ToGdsPoints for I
+where
+    T: Num + Scalar + ToPrimitive,
+    I: Iterator<Item = LenCo<Absolute, T>>,
+{
+    type Scale = Length<Absolute, T>;
+    fn to_gdspoints(self, scale: Self::Scale) -> Vec<GdsPoint> {
+        self.map(|x| {
+            GdsPoint::new(
+                (x[0] / scale.clone()).to_i32().unwrap(),
+                (x[1] / scale.clone()).to_i32().unwrap(),
+            )
+        })
+        .collect()
+    }
+}
+
+/* impl<I, T> ToGdsPoints for I
+where
+    I: Iterator<Item = LenCo<Relative, T>>,
+{
+    type Scale = ();
+    fn to_gdspoints(self, _: ()) -> Vec<GdsPoint> {
+        self.map(|x| GdsPoint::new(x[0].to_i32().unwrap(), x[1].to_i32().unwrap()))
+    }
+} */
+
+impl<T> DgirCell<Absolute, T>
+where
+    T: Num + Scalar + ToPrimitive,
+{
+    pub fn to_gds(self, database_unit: Length<Absolute, T>) -> gds21::GdsStruct {
         use gds21::*;
         let mut new_cell = GdsStruct::new(self.name);
-        for painting in self.paintings {
+        for painting in self.elements {
             new_cell.elems.push(match painting {
-                Painting::Path(p) => GdsElement::GdsPath({
-                    let xy = p.coordinates.to_xy(database_unit);
+                Element::Path(p) => GdsElement::GdsPath({
+                    let xy = p.curve.to_gdspoints(database_unit);
                     points_num_check(&xy);
                     GdsPath {
                         layer: p.color.layer,
@@ -173,10 +206,10 @@ impl<T: Distance> Album<T> {
                         ..Default::default()
                     }
                 }),
-                Painting::Polygon(p) => GdsElement::GdsBoundary({
-                    let mut xy = p.coordinates.to_xy(database_unit);
-                    close_curve(&mut xy);
-                    points_num_check(&xy);
+                Element::Polygon(p) => GdsElement::GdsBoundary({
+                    let mut xy = p.area.to_gdspoints(database_unit);
+                    debug_assert!(close_curve(&mut xy));
+                    debug_assert!(points_num_check(&xy));
                     GdsBoundary {
                         layer: p.color.layer,
                         datatype: p.color.datatype,
@@ -184,7 +217,7 @@ impl<T: Distance> Album<T> {
                         ..Default::default()
                     }
                 }),
-                Painting::Ref(r) => GdsElement::GdsStructRef(GdsStructRef {
+                Element::Ref(r) => GdsElement::GdsStructRef(GdsStructRef {
                     name: r.reference,
                     xy: GdsPoint::new(
                         (r.position[0] / database_unit).to_i32().unwrap(),
@@ -199,33 +232,57 @@ impl<T: Distance> Album<T> {
     }
 }
 
-impl<T: Distance> PartialEq for Album<T> {
+impl<L, T> PartialEq for DgirCell<L, T>
+where
+    L: LengthType,
+    T: Num + Scalar,
+{
     fn eq(&self, other: &Self) -> bool {
         self.name.eq(&other.name)
     }
 }
-impl<T: Distance> Eq for Album<T> {}
+impl<L, T> Eq for DgirCell<L, T>
+where
+    L: LengthType,
+    T: Num + Scalar,
+{
+}
 
-impl<T: Distance> PartialOrd for Album<T> {
+impl<L, T> PartialOrd for DgirCell<L, T>
+where
+    L: LengthType,
+    T: Num + Scalar,
+{
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         self.name.partial_cmp(&other.name)
     }
 }
-impl<T: Distance> Ord for Album<T> {
+impl<L, T> Ord for DgirCell<L, T>
+where
+    L: LengthType,
+    T: Num + Scalar,
+{
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.name.cmp(&other.name)
     }
 }
 
-impl<T: Distance> Deref for Album<T> {
-    type Target = Vec<Painting<T>>;
-    fn deref(&self) -> &Self::Target {
-        &self.paintings
+impl<L, T> AsRef<Vec<Element<L, T>>> for DgirCell<L, T>
+where
+    L: LengthType,
+    T: Num + Scalar,
+{
+    fn as_ref(&self) -> &Vec<Element<L, T>> {
+        &self.elements
     }
 }
 
-impl<T: Distance> DerefMut for Album<T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.paintings
+impl<L, T> AsMut<Vec<Element<L, T>>> for DgirCell<L, T>
+where
+    L: LengthType,
+    T: Num + Scalar,
+{
+    fn as_mut(&mut self) -> &mut Vec<Element<L, T>> {
+        &mut self.elements
     }
 }

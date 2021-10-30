@@ -1,5 +1,6 @@
 use core::f64;
 use std::{
+    fmt::Debug,
     marker::PhantomData,
     ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign},
 };
@@ -11,7 +12,7 @@ pub trait AbsoluteUnit {
 }
 
 pub trait RelativeUnit {
-    const CONVERSION_FACTOR: f64;
+    const CONVERSION_FACTOR: u32;
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -174,7 +175,7 @@ pub struct Absolute;
 #[derive(Debug, Clone, Copy)]
 pub struct Relative;
 
-pub trait LengthType {}
+pub trait LengthType: 'static + Clone + Copy + Debug {}
 impl LengthType for Absolute {}
 impl LengthType for Relative {}
 
@@ -208,10 +209,11 @@ impl AbsoluteUnit for Meter {
     const CONVERSION_FACTOR: f64 = 1e6;
 }
 #[derive(Debug, Clone, Copy)]
-pub struct UserUnit;
-impl RelativeUnit for UserUnit {
-    const CONVERSION_FACTOR: f64 = 1.;
+pub struct DbUnit;
+impl RelativeUnit for DbUnit {
+    const CONVERSION_FACTOR: u32 = 1;
 }
+
 
 pub type AbsoluteLength<S> = Length<Absolute, S>;
 pub type RelativeLength<S> = Length<Relative, S>;

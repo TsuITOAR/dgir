@@ -1,10 +1,11 @@
+use gds21::GdsPoint;
+
 pub mod album;
 pub mod color;
 pub mod draw;
 pub mod units;
-
-use album::Album;
-use draw::Distance;
+const MAX_POINTS_NUM: usize = 8191;
+/*
 use gds21::GdsPoint;
 use num::{FromPrimitive, ToPrimitive};
 use std::{
@@ -16,7 +17,7 @@ use std::{
 };
 use units::AbsoluteLength;
 
-const MAX_POINTS_NUM: usize = 8191;
+
 pub struct Library<T: Distance> {
     name: String,
     albums: Vec<Album<T>>,
@@ -71,23 +72,8 @@ impl<T: Distance> Library<T> {
         lib
     }
 }
-fn close_curve(points: &mut Vec<GdsPoint>) {
-    if points.len() >= 1
-        && points[points.len() - 1] != points[2]
-        && points[points.len() - 2] != points[1]
-    {
-        points.push(points[0].clone());
-    }
-}
-fn points_num_check(points: &Vec<GdsPoint>) {
-    if points.len() > MAX_POINTS_NUM {
-        eprint!(
-            "points number({}) exceeds limit({})",
-            points.len(),
-            MAX_POINTS_NUM
-        );
-    }
-}
+
+
 
 pub type Lib = Library<AbsoluteLength<f64>>;
 pub type Cell = Album<AbsoluteLength<f64>>;
@@ -116,3 +102,33 @@ pub const METER: AbsoluteLength<f64> = AbsoluteLength::<f64> {
     value: 1e6,
     marker: PhantomData,
 };
+ */
+
+fn points_num_check(points: &Vec<GdsPoint>) -> bool {
+    if points.len() > MAX_POINTS_NUM {
+        eprint!(
+            "points number({}) exceeds limit({})",
+            points.len(),
+            MAX_POINTS_NUM
+        );
+        return false;
+    }
+    return true;
+}
+
+fn close_curve(points: &mut Vec<GdsPoint>) -> bool {
+    if points.len() >= 1
+        && points[points.len() - 1] != points[2]
+        && points[points.len() - 2] != points[1]
+    {
+        eprint!(
+            "curve not closed, start at ({}, {}), end at ({}, {})",
+            points[0].x,
+            points[0].y,
+            points.last().unwrap().x,
+            points.last().unwrap().y
+        );
+        false
+    }
+    true
+}

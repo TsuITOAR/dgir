@@ -1,7 +1,7 @@
-use super::{Coordinate, Distance, Resolution};
-use crate::units::Angle;
+use super::{coordinate::Coordinate, Resolution};
+use crate::units::{Angle, Length, LengthType};
 use nalgebra::Scalar;
-use num::{traits::FloatConst, Float, FromPrimitive, ToPrimitive};
+use num::{traits::FloatConst, Float, FromPrimitive, Num, ToPrimitive};
 use std::{
     fmt::Debug,
     iter::{Chain, Fuse, FusedIterator, Iterator, Map, Rev},
@@ -210,15 +210,17 @@ impl<S> _Arc<S> {
     fn new(radius: S) -> Self {
         Self { radius }
     }
+}
+impl<L, T> _Arc<Length<L, T>>
+where
+    L: LengthType,
+    T: Num + Float + FloatConst + Scalar + FromPrimitive,
+{
     fn to_points(
         self,
-        angle: (Angle<<S as Distance>::Basic>, Angle<<S as Distance>::Basic>),
-        resolution: Resolution<S>,
-    ) -> impl DoubleEndedIterator<Item = Coordinate<S>>
-    where
-        S: Distance + Copy,
-        <S as Distance>::Basic: FloatConst + Float + ToPrimitive + FromPrimitive,
-    {
+        angle: (Angle<T>, Angle<T>),
+        resolution: Resolution<Length<L, T>>,
+    ) -> impl DoubleEndedIterator<Item = Coordinate<Length<L, T>>> {
         let ang_range = (angle.1 - angle.0).to_rad();
         let section_num = match resolution {
             Resolution::MinNumber(n) => {

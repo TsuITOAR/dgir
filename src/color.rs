@@ -1,7 +1,4 @@
-use crate::{
-    album::{Painting, Path, Polygon},
-    draw::{Distance, Drawing},
-};
+use crate::album::{Element, Path, Polygon};
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct LayerData {
@@ -13,7 +10,7 @@ impl LayerData {
         Self { layer, datatype }
     }
 }
-pub trait Color: Copy {
+/* pub trait Color: Copy {
     fn to_brush<T: Distance + Copy>(self, width: T) -> Brush<T, Self> {
         Brush {
             width: Some(width),
@@ -29,9 +26,9 @@ pub trait Color: Copy {
     fn to_filler(self) -> Filler<Self> {
         Filler { color: self }
     }
-}
+} */
 
-#[derive(Debug, Clone, Copy)]
+/* #[derive(Debug, Clone, Copy)]
 pub struct Brush<T: Distance + Copy, C: Color> {
     width: Option<T>,
     color: C,
@@ -77,4 +74,4 @@ impl<T: Distance + Copy> Shader<T> for Filler<LayerData> {
             color: self.color,
         })
     }
-}
+} */

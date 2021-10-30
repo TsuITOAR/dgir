@@ -1,34 +1,45 @@
 use std::{
-    mem::{self, size_of},
+    mem,
     ops::{Add, Index, IndexMut, Mul, Sub},
 };
 
 use nalgebra::{Point2, Scalar};
+use num::Num;
 
-use super::Distance;
+use crate::units::{Length, LengthType};
 
-pub(crate) struct Coordinate<T: Scalar>(Point2<T>);
 
-impl<T: Distance> Coordinate<T> {
-    fn to_basic(self) -> Coordinate<T::Basic> {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd)]
+pub struct Coordinate<T: Scalar>(pub(crate) Point2<T>);
+
+pub(crate) type LenCo<L, T> = Coordinate<Length<L, T>>;
+
+impl<L: LengthType, T: Scalar + Num> LenCo<L, T> {
+    fn to_basic(self) -> Coordinate<T> {
         unsafe {
-            debug_assert_eq!(size_of::<T>(), size_of::<T::Basic>());
-            let ret = ((&self as *const Coordinate<T>) as *const Coordinate<T::Basic>).read();
+            debug_assert_eq!(
+                mem::size_of::<Coordinate<T>>(),
+                mem::size_of::<LenCo<L, T>>()
+            );
+            let ret = ((&self as *const LenCo<L, T>) as *const Coordinate<T>).read();
             mem::forget(self);
             ret
         }
     }
-    fn from_basic(basic: Coordinate<T::Basic>) -> Self {
+    fn from_basic(basic: Coordinate<T>) -> Self {
         unsafe {
-            debug_assert_eq!(size_of::<T>(), size_of::<T::Basic>());
-            let ret = ((&basic as *const Coordinate<T::Basic>) as *const Coordinate<T>).read();
+            debug_assert_eq!(
+                mem::size_of::<Coordinate<T>>(),
+                mem::size_of::<LenCo<L, T>>()
+            );
+            let ret = ((&basic as *const Coordinate<T>) as *const LenCo<L, T>).read();
             mem::forget(basic);
             ret
         }
     }
 }
 
-impl<F, T: Distance> From<F> for Coordinate<T>
+impl<F, T: Scalar> From<F> for Coordinate<T>
 where
     Point2<T>: From<F>,
 {
@@ -37,7 +48,7 @@ where
     }
 }
 
-impl<I, T: Distance> Index<I> for Coordinate<T>
+impl<I, T: Scalar> Index<I> for Coordinate<T>
 where
     Point2<T>: Index<I>,
 {
@@ -47,7 +58,7 @@ where
     }
 }
 
-impl<I, T: Distance> IndexMut<I> for Coordinate<T>
+impl<I, T: Scalar> IndexMut<I> for Coordinate<T>
 where
     Point2<T>: IndexMut<I>,
 {
@@ -56,7 +67,7 @@ where
     }
 }
 
-impl<A, T: Distance> Add<A> for Coordinate<T>
+impl<A, T: Scalar> Add<A> for Coordinate<T>
 where
     Point2<T>: Add<A, Output = Point2<T>>,
 {
@@ -66,7 +77,7 @@ where
     }
 }
 
-impl<S, T: Distance> Sub<S> for Coordinate<T>
+impl<S, T: Scalar> Sub<S> for Coordinate<T>
 where
     Point2<T>: Sub<S, Output = Point2<T>>,
 {
@@ -76,20 +87,20 @@ where
     }
 }
 
-impl<M, T: Distance> Mul<Coordinate<T>> for Wrapper<M>
+impl<M, L: LengthType, T: Scalar + Num> Mul<LenCo<L, T>> for MulAsScalar<M>
 where
-    M: Mul<Point2<T::Basic>, Output = Point2<T::Basic>>,
+    M: Mul<Point2<T>, Output = Point2<T>>,
 {
-    type Output = Coordinate<T>;
-    fn mul(self, rhs: Coordinate<T>) -> Self::Output {
+    type Output = LenCo<L, T>;
+    fn mul(self, rhs: LenCo<L, T>) -> Self::Output {
         Coordinate::from_basic(Coordinate(self.0 * rhs.to_basic().0))
     }
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) struct Wrapper<M>(pub(crate) M);
+pub struct MulAsScalar<M>(pub(crate) M);
 
-impl<M> From<M> for Wrapper<M> {
+impl<M> From<M> for MulAsScalar<M> {
     fn from(m: M) -> Self {
         Self(m)
     }
