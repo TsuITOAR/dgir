@@ -129,6 +129,7 @@ fn close_curve(points: &mut Vec<GdsPoint>) -> bool {
             points.last().unwrap().y
         );
         false
+    } else {
+        true
     }
-    true
 }
