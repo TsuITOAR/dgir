@@ -1,16 +1,16 @@
 use super::{Coordinate, Distance, Resolution};
 use crate::units::Angle;
+use nalgebra::Scalar;
 use num::{traits::FloatConst, Float, FromPrimitive, ToPrimitive};
 use std::{
     fmt::Debug,
     iter::{Chain, Fuse, FusedIterator, Iterator, Map, Rev},
-    ops::AddAssign,
 };
-pub struct Curve<T, C: Iterator<Item = Coordinate<T>>> {
+pub struct Curve<T: Scalar, C: Iterator<Item = Coordinate<T>>> {
     curve: C,
 }
 
-impl<T, C: Iterator<Item = Coordinate<T>>> Curve<T, C> {
+impl<T: Scalar, C: Iterator<Item = Coordinate<T>>> Curve<T, C> {
     pub fn new(curve: C) -> Self {
         Self { curve }
     }
@@ -25,66 +25,16 @@ impl<T, C: Iterator<Item = Coordinate<T>>> Curve<T, C> {
             current: None,
         })
     }
-    pub fn transfer<F: FnMut(Coordinate<T>) -> Coordinate<T>>(self, f: F) -> Map<Self, F> {
-        self.map(f)
-    }
-    pub fn translate<'a>(
-        self,
-        x: T,
-        y: T,
-    ) -> Map<Self, impl FnMut(Coordinate<T>) -> Coordinate<T> + 'a>
-    where
-        T: AddAssign + Copy + 'a,
-    {
-        self.transfer(move |mut src| {
-            src[0] += x;
-            src[1] += y;
-            src
-        })
-    }
-    pub fn scale<'a, X: Into<Option<(T, T)>>>(
-        self,
-        scale: T::Basic,
-        center: X,
-    ) -> Map<Self, impl FnMut(Coordinate<T>) -> Coordinate<T> + 'a>
-    where
-        T: 'a + Copy + Distance,
-    {
-        let center = center.into().unwrap_or((T::zero(), T::zero()));
-        self.transfer(move |mut src| {
-            src[0] = (src[0] - center.0) * scale + center.0;
-            src[1] = (src[1] - center.1) * scale + center.1;
-            src
-        })
-    }
-    pub fn rotate<'a, X: Into<Option<(T, T)>>>(
-        self,
-
-        ang: Angle<T::Basic>,
-        center: X,
-    ) -> Map<Self, impl FnMut(Coordinate<T>) -> Coordinate<T> + 'a>
-    where
-        T: 'a + Copy + Distance,
-    {
-        let center = center.into().unwrap_or((T::zero(), T::zero()));
-        self.transfer(move |mut src| {
-            let x = src[0] - center.0;
-            let y = src[1] - center.1;
-            src[0] = x * ang.cos() - y * ang.sin() + center.0;
-            src[1] = x * ang.sin() + y * ang.cos() + center.1;
-            src
-        })
-    }
 }
 
 #[derive(Debug, Clone)]
-pub struct Close<T, C: FusedIterator<Item = Coordinate<T>>> {
+pub struct Close<T: Scalar, C: FusedIterator<Item = Coordinate<T>>> {
     curve: C,
     first: Option<C::Item>,
     current: Option<C::Item>,
 }
 
-impl<T: Copy + PartialEq, C: FusedIterator<Item = Coordinate<T>>> Iterator for Close<T, C> {
+impl<T: Scalar, C: FusedIterator<Item = Coordinate<T>>> Iterator for Close<T, C> {
     type Item = C::Item;
     fn next(&mut self) -> Option<Self::Item> {
         if let None = self.current {
@@ -128,6 +78,7 @@ fn close_curve() {
 
 impl<T, C> Iterator for Curve<T, C>
 where
+    T: Scalar,
     C: Iterator<Item = Coordinate<T>>,
 {
     type Item = Coordinate<T>;
@@ -138,6 +89,7 @@ where
 
 impl<T, C> DoubleEndedIterator for Curve<T, C>
 where
+    T: Scalar,
     C: DoubleEndedIterator<Item = Coordinate<T>>,
 {
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -147,6 +99,7 @@ where
 
 impl<T, C> ExactSizeIterator for Curve<T, C>
 where
+    T: Scalar,
     C: ExactSizeIterator<Item = Coordinate<T>>,
 {
     fn len(&self) -> usize {
@@ -154,15 +107,21 @@ where
     }
 }
 
-impl<T, C> FusedIterator for Curve<T, C> where C: FusedIterator<Item = Coordinate<T>> {}
+impl<T, C> FusedIterator for Curve<T, C>
+where
+    T: Scalar,
+    C: FusedIterator<Item = Coordinate<T>>,
+{
+}
 
-pub trait IntoCurve<T> {
+pub trait IntoCurve<T: Scalar> {
     type Curve: Iterator<Item = Coordinate<T>>;
     fn into_curve(self) -> Curve<T, Self::Curve>;
 }
 
 impl<T, C, S> IntoCurve<T> for C
 where
+    T: Scalar,
     C: IntoIterator<Item = S>,
     S: Into<Coordinate<T>>,
 {
@@ -174,11 +133,11 @@ where
     }
 }
 
-pub struct Area<T, A: Iterator<Item = Coordinate<T>>> {
+pub struct Area<T: Scalar, A: Iterator<Item = Coordinate<T>>> {
     area: A,
 }
 
-impl<T, A: Iterator<Item = Coordinate<T>>> Area<T, A> {
+impl<T: Scalar, A: Iterator<Item = Coordinate<T>>> Area<T, A> {
     pub fn new(area: A) -> Self {
         Self { area }
     }
@@ -186,6 +145,7 @@ impl<T, A: Iterator<Item = Coordinate<T>>> Area<T, A> {
 
 impl<T, A> Iterator for Area<T, A>
 where
+    T: Scalar,
     A: Iterator<Item = Coordinate<T>>,
 {
     type Item = Coordinate<T>;
@@ -196,6 +156,7 @@ where
 
 impl<T, A> DoubleEndedIterator for Area<T, A>
 where
+    T: Scalar,
     A: DoubleEndedIterator<Item = Coordinate<T>>,
 {
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -205,6 +166,7 @@ where
 
 impl<T, A> ExactSizeIterator for Area<T, A>
 where
+    T: Scalar,
     A: ExactSizeIterator<Item = Coordinate<T>>,
 {
     fn len(&self) -> usize {
@@ -212,18 +174,19 @@ where
     }
 }
 
-impl<T, A> FusedIterator for Area<T, A> where A: FusedIterator<Item = Coordinate<T>> {}
-pub trait Sweep<T> {
+impl<T: Scalar, A> FusedIterator for Area<T, A> where A: FusedIterator<Item = Coordinate<T>> {}
+pub trait Sweep<T: Scalar> {
     type Output: Iterator<Item = Coordinate<T>>;
     fn sweep(self, range: (T, T)) -> Area<T, Self::Output>;
 }
 
-pub trait Bias<T>: IntoIterator<Item = Coordinate<T>> {
+pub trait Bias<T: Scalar>: IntoIterator<Item = Coordinate<T>> {
     fn bias(self, b: T) -> Self;
 }
 
 impl<C, T> Sweep<T> for C
 where
+    T: Scalar,
     C: Bias<T> + Clone,
     <C as IntoIterator>::IntoIter: DoubleEndedIterator,
 {

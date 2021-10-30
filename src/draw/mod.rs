@@ -1,16 +1,22 @@
-use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign};
+use std::{
+    fmt::Debug,
+    marker::PhantomData,
+    ops::{Add, AddAssign, Div, DivAssign, Index, Mul, MulAssign, Sub, SubAssign},
+};
 
 use crate::units::{Absolute, Angle, Length, Meter};
-use arrayvec::ArrayVec;
+use gds21::GdsPoint;
+use nalgebra::{Point2, Scalar};
 use num::{traits::NumAssignOps, Float, FromPrimitive, Num, ToPrimitive, Zero};
 
 pub mod curve;
+pub mod transfer;
 use self::elements::{Compound, IntoCurve};
 
 pub mod elements;
-
+pub mod coordinate;
 //TO-DO:This actually cost more time for little file, need to figure out
-pub(crate) type Coordinate<T> = ArrayVec<T, 2>;
+pub(crate) type Coordinate<T> = Point2<T>;
 
 #[derive(Debug, Clone, Copy)]
 pub enum Resolution<T> {
@@ -19,7 +25,11 @@ pub enum Resolution<T> {
 }
 
 pub trait Distance:
-    Sized
+    'static
+    + Sized
+    + Clone
+    + Debug
+    + PartialEq
     + Add<Self, Output = Self>
     + AddAssign
     + Sub<Self, Output = Self>
@@ -30,24 +40,35 @@ pub trait Distance:
     + DivAssign<Self::Basic>
     + Zero
 {
-    type Basic: Num + NumAssignOps + Float + Sized + Copy + ToPrimitive + FromPrimitive;
+    type Basic: Num + NumAssignOps + Float + Sized + Copy + ToPrimitive + FromPrimitive + Debug;
     fn from(meter: f64) -> Self;
+    fn to_basic(self) -> Self::Basic;
+    fn from_basic(b: Self::Basic) -> Self;
 }
 
-impl<S: Num + NumAssignOps + Copy + Float + ToPrimitive + FromPrimitive> Distance
+impl<S: 'static + Num + NumAssignOps + Copy + Float + ToPrimitive + FromPrimitive + Debug> Distance
     for Length<Absolute, S>
 {
     type Basic = S;
     fn from(meter: f64) -> Self {
         Length::new_absolute::<Meter>(S::from_f64(meter).unwrap())
     }
+    fn to_basic(self) -> Self::Basic {
+        self.value
+    }
+    fn from_basic(b: Self::Basic) -> Self {
+        Self {
+            value: b,
+            marker: PhantomData,
+        }
+    }
 }
-pub struct Curve<In: 'static, Out: 'static> {
+pub struct Curve<In: 'static, Out: 'static + Scalar> {
     para_list: Box<dyn Iterator<Item = In>>,
     para_equ: Box<dyn FnMut(In) -> Coordinate<Out>>,
 }
 
-impl<In: 'static + Copy, Out: 'static> Curve<In, Out> {
+impl<In: 'static + Copy, Out: 'static + Scalar> Curve<In, Out> {
     pub fn new(
         list: impl Iterator<Item = In> + 'static,
         para_equ: impl FnMut(In) -> Coordinate<Out> + 'static,
@@ -94,16 +115,21 @@ impl<In: 'static + Copy, Out: 'static> Curve<In, Out> {
         self.decorate_output(decorator)
     }
 }
-pub enum Drawing<T> {
+pub enum Drawing<T: Scalar> {
     Iter(Box<dyn Iterator<Item = Coordinate<T>>>),
     Points(Vec<Coordinate<T>>),
 }
-impl<T: Distance + Clone> Drawing<T> {
-    pub(crate) fn to_xy(self, database_length: T) -> Vec<i32> {
-        let convert = |x: T| (x / database_length.clone()).to_i32().unwrap();
-        let ret: Vec<i32> = match self {
-            Drawing::Iter(iter) => iter.flatten().map(convert).collect(),
-            Drawing::Points(points) => points.into_iter().flatten().map(convert).collect(),
+impl<T: Distance + Clone + Scalar> Drawing<T> {
+    pub(crate) fn to_xy(self, database_length: T) -> Vec<GdsPoint> {
+        let convert = |x: Coordinate<T>| -> GdsPoint {
+            GdsPoint::new(
+                (x[0].clone() / database_length.clone()).to_i32().unwrap(),
+                (x[1].clone() / database_length.clone()).to_i32().unwrap(),
+            )
+        };
+        let ret: Vec<GdsPoint> = match self {
+            Drawing::Iter(iter) => iter.map(convert).collect(),
+            Drawing::Points(points) => points.into_iter().map(convert).collect(),
         };
         ret
     }
@@ -131,7 +157,6 @@ impl<T: Distance + Clone> Drawing<T> {
         }))
     }
 }
-
 
 pub trait Offset: Sized {
     type Field: Add<Self::Field, Output = Self::Field> + Copy;
@@ -163,6 +188,7 @@ impl<C> IntoCurve for Broadened<C>
 where
     C: IntoCurve + Broaden,
     C::In: Copy,
+    C::Out: Scalar,
     C::Field: Distance,
     <C::Field as Distance>::Basic: FromPrimitive,
 {
@@ -194,7 +220,6 @@ pub trait Broaden: Sized + Offset + IntoCurve + Clone {
     }
 }
 
-pub struct Seed<S>{
-    core:S,
-    
+pub struct Seed<S> {
+    core: S,
 }

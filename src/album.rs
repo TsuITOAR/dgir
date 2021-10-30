@@ -186,11 +186,10 @@ impl<T: Distance> Album<T> {
                 }),
                 Painting::Ref(r) => GdsElement::GdsStructRef(GdsStructRef {
                     name: r.reference,
-                    xy: r
-                        .position
-                        .into_iter()
-                        .map(|x| (x / database_unit).to_i32().unwrap())
-                        .collect(),
+                    xy: GdsPoint::new(
+                        (r.position[0] / database_unit).to_i32().unwrap(),
+                        (r.position[1] / database_unit).to_i32().unwrap(),
+                    ),
                     strans: r.decorator,
                     ..Default::default()
                 }),

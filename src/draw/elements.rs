@@ -123,8 +123,6 @@ where
     }
 }
 
-
-
 #[derive(Debug, Clone, Copy)]
 pub struct Circle<S> {
     center: (S, S),

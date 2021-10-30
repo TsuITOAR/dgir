@@ -5,6 +5,7 @@ pub mod units;
 
 use album::Album;
 use draw::Distance;
+use gds21::GdsPoint;
 use num::{FromPrimitive, ToPrimitive};
 use std::{
     collections::BTreeSet,
@@ -70,20 +71,19 @@ impl<T: Distance> Library<T> {
         lib
     }
 }
-fn close_curve(points: &mut Vec<i32>) {
-    if points.len() >= 2
+fn close_curve(points: &mut Vec<GdsPoint>) {
+    if points.len() >= 1
         && points[points.len() - 1] != points[2]
         && points[points.len() - 2] != points[1]
     {
-        points.push(points[0]);
-        points.push(points[1]);
+        points.push(points[0].clone());
     }
 }
-fn points_num_check(points: &Vec<i32>) {
-    if points.len() / 2 > MAX_POINTS_NUM {
+fn points_num_check(points: &Vec<GdsPoint>) {
+    if points.len() > MAX_POINTS_NUM {
         eprint!(
-            "points number({}) out of limit({})",
-            points.len() / 2,
+            "points number({}) exceeds limit({})",
+            points.len(),
             MAX_POINTS_NUM
         );
     }
