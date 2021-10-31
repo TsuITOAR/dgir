@@ -40,7 +40,7 @@ impl<S> Length<Relative, S> {
         U: RelativeUnit,
     {
         Length {
-            value: value * S::from_f64(<U as RelativeUnit>::CONVERSION_FACTOR).unwrap(),
+            value: value * S::from_u32(<U as RelativeUnit>::CONVERSION_FACTOR).unwrap(),
             marker: PhantomData,
         }
     }

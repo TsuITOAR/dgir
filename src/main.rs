@@ -1,8 +1,9 @@
 use std::time::Instant;
 
-use dgir::{Cell, Lib, MICROMETER, NANOMETER, color::{Color, LayerData, Shader}, draw::{Broaden, Resolution, elements::{CircularArc, IntoCurve, Rectangle}}, units::Angle};
+use dgir::draw::curve::CircularArc;
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let start = Instant::now();
+    /* let start = Instant::now();
     let mut lib = Lib::new("first_lib");
     let mut cell = Cell::new("first_alb");
     let layer = LayerData::new(1, 0);
@@ -27,6 +28,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let user_unit = MICROMETER;
     let db_unit = NANOMETER;
     lib.to_gds(user_unit, db_unit).save("first_file.gds")?;
-    println!("time costed:{}ms", start.elapsed().as_millis());
+    println!("time costed:{}ms", start.elapsed().as_millis()); */
     Ok(())
 }

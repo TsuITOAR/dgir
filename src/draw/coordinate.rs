@@ -14,6 +14,10 @@ pub struct Coordinate<T: Scalar>(pub(crate) Point2<T>);
 
 pub(crate) type LenCo<L, T> = Coordinate<Length<L, T>>;
 
+impl<T:Scalar> Coordinate<T>{
+    
+}
+
 impl<L: LengthType, T: Scalar + Num> LenCo<L, T> {
     fn to_basic(self) -> Coordinate<T> {
         unsafe {

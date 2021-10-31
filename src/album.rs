@@ -165,8 +165,8 @@ where
     fn to_gdspoints(self, scale: Self::Scale) -> Vec<GdsPoint> {
         self.map(|x| {
             GdsPoint::new(
-                (x[0] / scale.clone()).to_i32().unwrap(),
-                (x[1] / scale.clone()).to_i32().unwrap(),
+                (x[0].clone() / scale.clone()).to_i32().unwrap(),
+                (x[1].clone() / scale.clone()).to_i32().unwrap(),
             )
         })
         .collect()
@@ -193,21 +193,21 @@ where
         for painting in self.elements {
             new_cell.elems.push(match painting {
                 Element::Path(p) => GdsElement::GdsPath({
-                    let xy = p.curve.to_gdspoints(database_unit);
+                    let xy = p.curve.to_gdspoints(database_unit.clone());
                     points_num_check(&xy);
                     GdsPath {
                         layer: p.color.layer,
                         datatype: p.color.datatype,
                         xy,
                         width: match p.width {
-                            Some(l) => (l / database_unit).to_i32(),
+                            Some(l) => (l / database_unit.clone()).to_i32(),
                             None => None,
                         },
                         ..Default::default()
                     }
                 }),
                 Element::Polygon(p) => GdsElement::GdsBoundary({
-                    let mut xy = p.area.to_gdspoints(database_unit);
+                    let mut xy = p.area.to_gdspoints(database_unit.clone());
                     debug_assert!(close_curve(&mut xy));
                     debug_assert!(points_num_check(&xy));
                     GdsBoundary {
@@ -220,8 +220,12 @@ where
                 Element::Ref(r) => GdsElement::GdsStructRef(GdsStructRef {
                     name: r.reference,
                     xy: GdsPoint::new(
-                        (r.position[0] / database_unit).to_i32().unwrap(),
-                        (r.position[1] / database_unit).to_i32().unwrap(),
+                        (r.position[0].clone() / database_unit.clone())
+                            .to_i32()
+                            .unwrap(),
+                        (r.position[1].clone() / database_unit.clone())
+                            .to_i32()
+                            .unwrap(),
                     ),
                     strans: r.decorator,
                     ..Default::default()
