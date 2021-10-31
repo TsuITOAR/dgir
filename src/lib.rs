@@ -1,6 +1,6 @@
 use gds21::GdsPoint;
 
-pub mod album;
+pub mod gds;
 pub mod color;
 pub mod draw;
 pub mod units;

@@ -1,20 +1,18 @@
 use std::{
-    collections::BTreeSet,
-    iter::Empty,
-    ops::{Deref, DerefMut},
+    collections::{BTreeMap, BTreeSet},
     rc::Rc,
 };
 
 use gds21::GdsPoint;
 use nalgebra::Scalar;
-use num::{FromPrimitive, Num, ToPrimitive};
+use num::{Num, ToPrimitive, Zero};
 
 use crate::{
     close_curve,
     color::LayerData,
     draw::coordinate::{Coordinate, LenCo},
     points_num_check,
-    units::{Absolute, Length, LengthType, Relative},
+    units::{Absolute, Length, LengthType},
 };
 
 pub struct Path<L: LengthType, T: Num + Scalar> {
@@ -57,10 +55,10 @@ where
     L: LengthType,
     T: Num + Scalar,
 {
-    pub(crate) decorator: Option<gds21::GdsStrans>,
+    pub(crate) strans: Option<gds21::GdsStrans>,
     pub(crate) position: Coordinate<Length<L, T>>,
     pub(crate) reference: String,
-    pub(crate) dependencies: Option<BTreeSet<Rc<DgirCell<L, T>>>>,
+    pub(crate) dependencies: BTreeSet<Rc<DgirCell<L, T>>>, //TODO need to avoid circular ref, or dead loop happens
 }
 
 pub enum Element<L, T>
@@ -131,18 +129,25 @@ where
         self
     }
 
-    /* pub fn as_ref(self) -> Ref<L, T> {
-        self.into()
-    } */
-
-    pub fn get_dependencies(&mut self) -> BTreeSet<Rc<DgirCell<L, T>>> {
+    pub fn as_ref(self) -> Ref<L, T> {
+        let mut s = self;
+        Ref {
+            strans: None,
+            dependencies: s.get_dependencies(),
+            position: Coordinate::from([Length::zero(), Length::zero()]),
+            reference: s.name,
+        }
+    }
+    //make sure every sub dependencies is empty
+    pub(crate) fn get_dependencies(&mut self) -> BTreeSet<Rc<DgirCell<L, T>>> {
         let mut dependencies = BTreeSet::new();
         for element in self.elements.iter_mut() {
             match element {
                 Element::Ref(Ref {
-                    dependencies: Some(ref mut d),
+                    dependencies: ref mut d,
                     ..
                 }) => {
+                    debug_assert!(is_sub_dependencies_empty(d));
                     dependencies.append(d);
                 }
                 _ => (),
@@ -151,6 +156,18 @@ where
         dependencies
     }
 }
+
+fn is_sub_dependencies_empty<L: LengthType, T: Scalar + Num>(
+    set: &BTreeSet<Rc<DgirCell<L, T>>>,
+) -> bool {
+    set.iter().all(|c| {
+        c.elements.iter().all(|e| match e {
+            Element::Ref(Ref { dependencies, .. }) => dependencies.is_empty(),
+            _ => true,
+        })
+    })
+}
+
 trait ToGdsPoints: Iterator {
     type Scale;
     fn to_gdspoints(self, scale: Self::Scale) -> Vec<GdsPoint>;
@@ -227,7 +244,7 @@ where
                             .to_i32()
                             .unwrap(),
                     ),
-                    strans: r.decorator,
+                    strans: r.strans,
                     ..Default::default()
                 }),
             })

@@ -8,14 +8,20 @@ use num::Num;
 
 use crate::units::{Length, LengthType};
 
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd)]
 pub struct Coordinate<T: Scalar>(pub(crate) Point2<T>);
 
 pub(crate) type LenCo<L, T> = Coordinate<Length<L, T>>;
 
-impl<T:Scalar> Coordinate<T>{
-    
+impl<T: Scalar> From<Coordinate<T>> for [T; 2] {
+    fn from(c: Coordinate<T>) -> Self {
+        <[T; 2]>::from(c.0.coords)
+    }
+}
+
+#[test]
+fn coordinate_to_array() {
+    assert_eq!([1., 2.], <[_; 2]>::from(Coordinate::from([1., 2.])))
 }
 
 impl<L: LengthType, T: Scalar + Num> LenCo<L, T> {

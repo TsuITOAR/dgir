@@ -158,7 +158,7 @@ impl<T: LengthType, S: Num + PartialOrd> PartialOrd<Length<T, S>> for Length<T, 
     }
 }
 
-impl<U: LengthType, S: Zero + Num> Zero for Length<U, S> {
+impl<U: LengthType, S: Num> Zero for Length<U, S> {
     fn zero() -> Self {
         Length {
             value: S::zero(),
@@ -169,6 +169,7 @@ impl<U: LengthType, S: Zero + Num> Zero for Length<U, S> {
         self.value.is_zero()
     }
 }
+
 #[derive(Debug, Clone, Copy)]
 pub struct Absolute;
 
@@ -213,7 +214,6 @@ pub struct DbUnit;
 impl RelativeUnit for DbUnit {
     const CONVERSION_FACTOR: u32 = 1;
 }
-
 
 pub type AbsoluteLength<S> = Length<Absolute, S>;
 pub type RelativeLength<S> = Length<Relative, S>;

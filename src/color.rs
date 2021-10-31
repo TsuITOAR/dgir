@@ -1,4 +1,4 @@
-use crate::album::{Element, Path, Polygon};
+use crate::gds::{Element, Path, Polygon};
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct LayerData {

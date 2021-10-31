@@ -92,7 +92,7 @@ where
     where
         T: ClosedAdd + Copy,
     {
-        self.matrix_trans(MulAsScalar(Translation::<T, 2>::new(x.value, y.value)))
+        self.matrix_trans(MulAsScalar(Translation::<T, 2>::from([x.value, y.value])))
     }
     pub fn scale(
         self,
