@@ -1,8 +1,8 @@
 use gds21::GdsPoint;
 
-pub mod gds;
 pub mod color;
 pub mod draw;
+pub mod gds;
 pub mod units;
 const MAX_POINTS_NUM: usize = 8191;
 /*
@@ -117,14 +117,11 @@ fn points_num_check(points: &Vec<GdsPoint>) -> bool {
 }
 
 fn close_curve(points: &mut Vec<GdsPoint>) -> bool {
-    if points.len() >= 1
-        && points[points.len() - 1] != points[2]
-        && points[points.len() - 2] != points[1]
-    {
+    if points.len() >= 2 && points.first() == points.last() {
         eprint!(
             "curve not closed, start at ({}, {}), end at ({}, {})",
-            points[0].x,
-            points[0].y,
+            points.first().unwrap().x,
+            points.first().unwrap().y,
             points.last().unwrap().x,
             points.last().unwrap().y
         );

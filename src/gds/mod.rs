@@ -1,7 +1,4 @@
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    rc::Rc,
-};
+use std::{collections::BTreeSet, ops::Index, rc::Rc};
 
 use gds21::GdsPoint;
 use nalgebra::Scalar;
@@ -12,11 +9,13 @@ use crate::{
     color::LayerData,
     draw::coordinate::{Coordinate, LenCo},
     points_num_check,
-    units::{Absolute, Length, LengthType},
+    units::{Absolute, Length, LengthType, Relative},
 };
 
+type Points<L, T> = Box<dyn Iterator<Item = LenCo<L, T>>>;
+
 pub struct Path<L: LengthType, T: Num + Scalar> {
-    pub curve: Box<dyn Iterator<Item = LenCo<L, T>>>,
+    pub curve: Points<L, T>,
     pub color: LayerData,
     pub width: Option<Length<L, T>>,
 }
@@ -34,7 +33,7 @@ where
 }
 
 pub struct Polygon<L: LengthType, T: Num + Scalar> {
-    pub area: Box<dyn Iterator<Item = LenCo<L, T>>>,
+    pub area: Points<L, T>,
     pub color: LayerData,
 }
 impl<L, T> Polygon<L, T>
@@ -56,9 +55,9 @@ where
     T: Num + Scalar,
 {
     pub(crate) strans: Option<gds21::GdsStrans>,
-    pub(crate) position: Coordinate<Length<L, T>>,
-    pub(crate) reference: String,
-    pub(crate) dependencies: BTreeSet<Rc<DgirCell<L, T>>>, //TODO need to avoid circular ref, or dead loop happens
+    pub(crate) pos: Coordinate<Length<L, T>>,
+    pub(crate) id: String,
+    pub(crate) dep: BTreeSet<Rc<DgirCell<L, T>>>, //TODO need to avoid circular ref, or dead loop happens
 }
 
 pub enum Element<L, T>
@@ -133,9 +132,9 @@ where
         let mut s = self;
         Ref {
             strans: None,
-            dependencies: s.get_dependencies(),
-            position: Coordinate::from([Length::zero(), Length::zero()]),
-            reference: s.name,
+            dep: s.get_dependencies(),
+            pos: Coordinate::from([Length::zero(), Length::zero()]),
+            id: s.name,
         }
     }
     //make sure every sub dependencies is empty
@@ -143,10 +142,7 @@ where
         let mut dependencies = BTreeSet::new();
         for element in self.elements.iter_mut() {
             match element {
-                Element::Ref(Ref {
-                    dependencies: ref mut d,
-                    ..
-                }) => {
+                Element::Ref(Ref { dep: ref mut d, .. }) => {
                     debug_assert!(is_sub_dependencies_empty(d));
                     dependencies.append(d);
                 }
@@ -162,69 +158,98 @@ fn is_sub_dependencies_empty<L: LengthType, T: Scalar + Num>(
 ) -> bool {
     set.iter().all(|c| {
         c.elements.iter().all(|e| match e {
-            Element::Ref(Ref { dependencies, .. }) => dependencies.is_empty(),
+            Element::Ref(Ref {
+                dep: dependencies, ..
+            }) => dependencies.is_empty(),
             _ => true,
         })
     })
 }
 
 trait ToGdsPoints: Iterator {
-    type Scale;
+    type Scale: Clone;
     fn to_gdspoints(self, scale: Self::Scale) -> Vec<GdsPoint>;
 }
 
-impl<I, T> ToGdsPoints for I
-where
-    T: Num + Scalar + ToPrimitive,
-    I: Iterator<Item = LenCo<Absolute, T>>,
-{
+//helper trait to constrain type of iterators which give different type of length
+//see https://stackoverflow.com/questions/34470995/how-to-allow-multiple-implementations-of-a-trait-on-various-types-of-intoiterato
+//see https://github.com/rust-lang/rust/issues/31844
+//see https://stackoverflow.com/questions/40392524/conflicting-trait-implementations-even-though-associated-types-differ
+trait CoordinateIterator {
+    type Length;
+    type Scale: Clone;
+    type Scalar: ToPrimitive;
+    type Coordinate: Index<usize, Output = Self::Length>;
+    fn after_scale(coor: Self::Coordinate, scale: Self::Scale) -> GdsPoint;
+}
+
+impl<C, T: Scalar + Num + ToPrimitive> CoordinateIterator for (C, LenCo<Absolute, T>) {
+    type Length = Length<Absolute, T>;
     type Scale = Length<Absolute, T>;
-    fn to_gdspoints(self, scale: Self::Scale) -> Vec<GdsPoint> {
-        self.map(|x| {
-            GdsPoint::new(
-                (x[0].clone() / scale.clone()).to_i32().unwrap(),
-                (x[1].clone() / scale.clone()).to_i32().unwrap(),
-            )
-        })
-        .collect()
+    type Scalar = T;
+    type Coordinate = LenCo<Absolute, T>;
+    fn after_scale(coor: Self::Coordinate, scale: Self::Scale) -> GdsPoint {
+        GdsPoint {
+            x: (coor[0].clone() / scale.clone()).to_i32().unwrap(),
+            y: (coor[1].clone() / scale.clone()).to_i32().unwrap(),
+        }
     }
 }
 
-/* impl<I, T> ToGdsPoints for I
-where
-    I: Iterator<Item = LenCo<Relative, T>>,
-{
+impl<C, T: Scalar + Num + ToPrimitive> CoordinateIterator for (C, LenCo<Relative, T>) {
+    type Length = Length<Relative, T>;
     type Scale = ();
-    fn to_gdspoints(self, _: ()) -> Vec<GdsPoint> {
-        self.map(|x| GdsPoint::new(x[0].to_i32().unwrap(), x[1].to_i32().unwrap()))
+    type Scalar = T;
+    type Coordinate = LenCo<Relative, T>;
+    fn after_scale(coor: Self::Coordinate, _: Self::Scale) -> GdsPoint {
+        GdsPoint {
+            x: (coor[0].value).to_i32().unwrap(),
+            y: (coor[1].value).to_i32().unwrap(),
+        }
     }
-} */
+}
+
+impl<I> ToGdsPoints for I
+where
+    I: Iterator,
+    (I, I::Item): CoordinateIterator<Coordinate = I::Item>,
+{
+    type Scale = <(I, I::Item) as CoordinateIterator>::Scale;
+    fn to_gdspoints(self, scale: Self::Scale) -> Vec<GdsPoint> {
+        self.map(|x| <(I, I::Item)>::after_scale(x, scale.clone()))
+            .collect()
+    }
+}
+
+trait ToGdsStruct {
+    fn to_gdsstruct(self) -> gds21::GdsStruct;
+}
 
 impl<T> DgirCell<Absolute, T>
 where
     T: Num + Scalar + ToPrimitive,
 {
-    pub fn to_gds(self, database_unit: Length<Absolute, T>) -> gds21::GdsStruct {
+    pub fn to_gds(self, database_len: Length<Absolute, T>) -> gds21::GdsStruct {
         use gds21::*;
         let mut new_cell = GdsStruct::new(self.name);
         for painting in self.elements {
             new_cell.elems.push(match painting {
                 Element::Path(p) => GdsElement::GdsPath({
-                    let xy = p.curve.to_gdspoints(database_unit.clone());
+                    let xy = p.curve.to_gdspoints(database_len.clone());
                     points_num_check(&xy);
                     GdsPath {
                         layer: p.color.layer,
                         datatype: p.color.datatype,
                         xy,
                         width: match p.width {
-                            Some(l) => (l / database_unit.clone()).to_i32(),
+                            Some(l) => (l / database_len.clone()).to_i32(),
                             None => None,
                         },
                         ..Default::default()
                     }
                 }),
                 Element::Polygon(p) => GdsElement::GdsBoundary({
-                    let mut xy = p.area.to_gdspoints(database_unit.clone());
+                    let mut xy = p.area.to_gdspoints(database_len.clone());
                     debug_assert!(close_curve(&mut xy));
                     debug_assert!(points_num_check(&xy));
                     GdsBoundary {
@@ -235,14 +260,10 @@ where
                     }
                 }),
                 Element::Ref(r) => GdsElement::GdsStructRef(GdsStructRef {
-                    name: r.reference,
+                    name: r.id,
                     xy: GdsPoint::new(
-                        (r.position[0].clone() / database_unit.clone())
-                            .to_i32()
-                            .unwrap(),
-                        (r.position[1].clone() / database_unit.clone())
-                            .to_i32()
-                            .unwrap(),
+                        (r.pos[0].clone() / database_len.clone()).to_i32().unwrap(),
+                        (r.pos[1].clone() / database_len.clone()).to_i32().unwrap(),
                     ),
                     strans: r.strans,
                     ..Default::default()
