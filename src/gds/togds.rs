@@ -85,7 +85,7 @@ where
             new_cell.elems.push(match painting {
                 Element::Path(p) => GdsElement::GdsPath({
                     let xy = p.curve.to_gds21_points(scale.clone());
-                    points_num_check(&xy);
+                    debug_assert!(points_num_check(&xy));
                     GdsPath {
                         layer: p.color.layer,
                         datatype: p.color.datatype,
