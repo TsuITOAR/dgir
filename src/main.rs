@@ -1,33 +1,28 @@
 use std::time::Instant;
 
-use dgir::draw::curve::CircularArc;
+use dgir::{
+    color::LayerData,
+    draw::{curve::IntoCurve, CircularArc, Resolution},
+    gds::DgirLibrary,
+    units::Angle,
+    zero, MICROMETER,
+};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /* let start = Instant::now();
-    let mut lib = Lib::new("first_lib");
-    let mut cell = Cell::new("first_alb");
-    let layer = LayerData::new(1, 0);
-    let arc = CircularArc::new(
-        (MICROMETER * 0., MICROMETER * 0.),
-        MICROMETER * 100.,
+    let start = Instant::now();
+    let mut lib = DgirLibrary::new("test");
+    let cir = CircularArc::new(
+        100. * MICROMETER,
+        (zero(), zero()),
         (Angle::from_deg(0.), Angle::from_deg(360.)),
-        Resolution::MinNumber(2001),
-    )
-    .set_width(MICROMETER)
-    .forward()
-    .draw();
-    cell.push(layer.to_filler().color(arc));
-    let mut top_cell = Cell::new("sec_alb");
-    top_cell.insert(cell.as_ref());
-    let rec = Rectangle::new(MICROMETER * 50., MICROMETER * 50.)
-        .forward()
-        .rotate(Angle::from_deg(30.))
-        .move_evenly(MICROMETER * 10., MICROMETER * 30.);
-    top_cell.push(layer.to_filler().color(rec.draw()));
-    lib.push(top_cell);
-    let user_unit = MICROMETER;
-    let db_unit = NANOMETER;
-    lib.to_gds(user_unit, db_unit).save("first_file.gds")?;
-    println!("time costed:{}ms", start.elapsed().as_millis()); */
+        Resolution::MinNumber(5000),
+    );
+    lib.push(
+        cir.into_curve()
+            .width_path(1.4 * MICROMETER, LayerData::new(1, 1))
+            .to_cell("cell_name"),
+    );
+    lib.save("test.gds").unwrap();
+    println!("time costed:{}ms", start.elapsed().as_millis());
     Ok(())
 }

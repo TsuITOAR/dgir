@@ -1,17 +1,20 @@
-use std::{collections::BTreeSet, ops::Index, rc::Rc};
+use std::{collections::BTreeSet, fmt::Debug, rc::Rc};
 
-use gds21::GdsPoint;
 use nalgebra::Scalar;
-use num::{Num, ToPrimitive, Zero};
+use num::{FromPrimitive, Num, ToPrimitive, Zero};
 
 use crate::{
-    close_curve,
     color::LayerData,
     draw::coordinate::{Coordinate, LenCo},
-    points_num_check,
     units::{Absolute, Length, LengthType, Relative},
 };
 
+use self::togds::ToGds21Library;
+
+pub mod togds;
+
+//const DISPLAY_POINTS_NUM: usize = 20;
+type Result<T> = gds21::GdsResult<T>;
 type Points<L, T> = Box<dyn Iterator<Item = LenCo<L, T>>>;
 
 pub struct Path<L: LengthType, T: Num + Scalar> {
@@ -19,16 +22,18 @@ pub struct Path<L: LengthType, T: Num + Scalar> {
     pub color: LayerData,
     pub width: Option<Length<L, T>>,
 }
-impl<L, T> Path<L, T>
+
+impl<L, T> Debug for Path<L, T>
 where
     L: LengthType,
     T: Num + Scalar,
 {
-    pub fn to_dgircell(self) -> Element<L, T>
-    where
-        T: Clone,
-    {
-        Element::Path(self)
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Path {{ curve: ..., (layer, datatype): {}, width: {:?} }}",
+            self.color, self.width
+        )
     }
 }
 
@@ -36,19 +41,18 @@ pub struct Polygon<L: LengthType, T: Num + Scalar> {
     pub area: Points<L, T>,
     pub color: LayerData,
 }
-impl<L, T> Polygon<L, T>
+
+impl<L, T> Debug for Polygon<L, T>
 where
     L: LengthType,
     T: Num + Scalar,
 {
-    pub fn to_dgircell(self) -> Element<L, T>
-    where
-        T: Clone,
-    {
-        Element::Polygon(self)
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Path {{ curve: ..., (layer, datatype): {}}}", self.color)
     }
 }
 
+#[derive(Debug)]
 pub struct Ref<L, T>
 where
     L: LengthType,
@@ -60,6 +64,7 @@ where
     pub(crate) dep: BTreeSet<Rc<DgirCell<L, T>>>, //TODO need to avoid circular ref, or dead loop happens
 }
 
+#[derive(Debug)]
 pub enum Element<L, T>
 where
     L: LengthType,
@@ -68,6 +73,38 @@ where
     Path(Path<L, T>),
     Polygon(Polygon<L, T>),
     Ref(Ref<L, T>),
+}
+
+impl<L, T> Element<L, T>
+where
+    L: LengthType,
+    T: Num + Scalar,
+{
+    pub fn to_cell<S: ToString>(self, name: S) -> DgirCell<L, T> {
+        DgirCell {
+            name: name.to_string(),
+            elements: vec![self],
+        }
+    }
+}
+
+pub trait ToDgirElement<L, T>
+where
+    L: LengthType,
+    T: Num + Scalar,
+{
+    fn to_dgir_element(self) -> Element<L, T>;
+}
+
+impl<F, L, T> ToDgirElement<L, T> for F
+where
+    L: LengthType,
+    T: Num + Scalar,
+    F: Into<Element<L, T>>,
+{
+    fn to_dgir_element(self) -> Element<L, T> {
+        self.into()
+    }
 }
 
 impl<L, T> From<Path<L, T>> for Element<L, T>
@@ -99,6 +136,8 @@ where
         Element::Ref(r)
     }
 }
+
+#[derive(Debug)]
 pub struct DgirCell<L, T>
 where
     L: LengthType,
@@ -123,7 +162,7 @@ where
         self.name = name;
         self
     }
-    pub fn insert<U: Into<Element<L, T>>>(&mut self, element: U) -> &mut Self {
+    pub fn push<U: Into<Element<L, T>>>(&mut self, element: U) -> &mut Self {
         self.elements.push(element.into());
         self
     }
@@ -164,114 +203,6 @@ fn is_sub_dependencies_empty<L: LengthType, T: Scalar + Num>(
             _ => true,
         })
     })
-}
-
-trait ToGdsPoints: Iterator {
-    type Scale: Clone;
-    fn to_gdspoints(self, scale: Self::Scale) -> Vec<GdsPoint>;
-}
-
-//helper trait to constrain type of iterators which give different type of length
-//see https://stackoverflow.com/questions/34470995/how-to-allow-multiple-implementations-of-a-trait-on-various-types-of-intoiterato
-//see https://github.com/rust-lang/rust/issues/31844
-//see https://stackoverflow.com/questions/40392524/conflicting-trait-implementations-even-though-associated-types-differ
-trait CoordinateIterator {
-    type Length;
-    type Scale: Clone;
-    type Scalar: ToPrimitive;
-    type Coordinate: Index<usize, Output = Self::Length>;
-    fn after_scale(coor: Self::Coordinate, scale: Self::Scale) -> GdsPoint;
-}
-
-impl<C, T: Scalar + Num + ToPrimitive> CoordinateIterator for (C, LenCo<Absolute, T>) {
-    type Length = Length<Absolute, T>;
-    type Scale = Length<Absolute, T>;
-    type Scalar = T;
-    type Coordinate = LenCo<Absolute, T>;
-    fn after_scale(coor: Self::Coordinate, scale: Self::Scale) -> GdsPoint {
-        GdsPoint {
-            x: (coor[0].clone() / scale.clone()).to_i32().unwrap(),
-            y: (coor[1].clone() / scale.clone()).to_i32().unwrap(),
-        }
-    }
-}
-
-impl<C, T: Scalar + Num + ToPrimitive> CoordinateIterator for (C, LenCo<Relative, T>) {
-    type Length = Length<Relative, T>;
-    type Scale = ();
-    type Scalar = T;
-    type Coordinate = LenCo<Relative, T>;
-    fn after_scale(coor: Self::Coordinate, _: Self::Scale) -> GdsPoint {
-        GdsPoint {
-            x: (coor[0].value).to_i32().unwrap(),
-            y: (coor[1].value).to_i32().unwrap(),
-        }
-    }
-}
-
-impl<I> ToGdsPoints for I
-where
-    I: Iterator,
-    (I, I::Item): CoordinateIterator<Coordinate = I::Item>,
-{
-    type Scale = <(I, I::Item) as CoordinateIterator>::Scale;
-    fn to_gdspoints(self, scale: Self::Scale) -> Vec<GdsPoint> {
-        self.map(|x| <(I, I::Item)>::after_scale(x, scale.clone()))
-            .collect()
-    }
-}
-
-trait ToGdsStruct {
-    fn to_gdsstruct(self) -> gds21::GdsStruct;
-}
-
-impl<T> DgirCell<Absolute, T>
-where
-    T: Num + Scalar + ToPrimitive,
-{
-    pub fn to_gds(self, database_len: Length<Absolute, T>) -> gds21::GdsStruct {
-        use gds21::*;
-        let mut new_cell = GdsStruct::new(self.name);
-        for painting in self.elements {
-            new_cell.elems.push(match painting {
-                Element::Path(p) => GdsElement::GdsPath({
-                    let xy = p.curve.to_gdspoints(database_len.clone());
-                    points_num_check(&xy);
-                    GdsPath {
-                        layer: p.color.layer,
-                        datatype: p.color.datatype,
-                        xy,
-                        width: match p.width {
-                            Some(l) => (l / database_len.clone()).to_i32(),
-                            None => None,
-                        },
-                        ..Default::default()
-                    }
-                }),
-                Element::Polygon(p) => GdsElement::GdsBoundary({
-                    let mut xy = p.area.to_gdspoints(database_len.clone());
-                    debug_assert!(close_curve(&mut xy));
-                    debug_assert!(points_num_check(&xy));
-                    GdsBoundary {
-                        layer: p.color.layer,
-                        datatype: p.color.datatype,
-                        xy,
-                        ..Default::default()
-                    }
-                }),
-                Element::Ref(r) => GdsElement::GdsStructRef(GdsStructRef {
-                    name: r.id,
-                    xy: GdsPoint::new(
-                        (r.pos[0].clone() / database_len.clone()).to_i32().unwrap(),
-                        (r.pos[1].clone() / database_len.clone()).to_i32().unwrap(),
-                    ),
-                    strans: r.strans,
-                    ..Default::default()
-                }),
-            })
-        }
-        new_cell
-    }
 }
 
 impl<L, T> PartialEq for DgirCell<L, T>
@@ -326,5 +257,94 @@ where
 {
     fn as_mut(&mut self) -> &mut Vec<Element<L, T>> {
         &mut self.elements
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+pub struct DgirUnits<T>
+where
+    T: Num + Scalar,
+{
+    database: Length<Absolute, T>,
+    user: Length<Absolute, T>,
+}
+
+impl<T> Default for DgirUnits<T>
+where
+    T: Num + Scalar + FromPrimitive,
+{
+    fn default() -> Self {
+        Self {
+            database: Length::new_absolute::<crate::units::Nanometer>(T::one()),
+            user: Length::new_absolute::<crate::units::Micrometer>(T::one()),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct DgirLibrary<L = Absolute, T = f64>
+where
+    L: LengthType,
+    T: Num + Scalar + FromPrimitive,
+{
+    pub name: Option<String>,
+    pub(crate) units: DgirUnits<T>,
+    pub(crate) cells: Vec<DgirCell<L, T>>,
+}
+
+impl<L, T> Default for DgirLibrary<L, T>
+where
+    L: LengthType,
+    T: Num + Scalar + FromPrimitive,
+{
+    fn default() -> Self {
+        Self {
+            name: None,
+            units: DgirUnits::default(),
+            cells: Vec::new(),
+        }
+    }
+}
+
+impl<L, T> DgirLibrary<L, T>
+where
+    L: LengthType,
+    T: Num + Scalar + FromPrimitive,
+{
+    pub fn new<S: ToString>(name: S) -> Self {
+        Self {
+            name: Some(name.to_string()),
+            ..Default::default()
+        }
+    }
+    pub fn set_database_unit(&mut self, db_len: Length<Absolute, T>) -> &mut Self {
+        self.units.database = db_len;
+        self
+    }
+    pub fn set_user_unit(&mut self, user_len: Length<Absolute, T>) -> &mut Self {
+        self.units.user = user_len;
+        self
+    }
+    pub fn push<C: Into<DgirCell<L, T>>>(&mut self, cell: C) -> &mut Self {
+        self.cells.push(cell.into());
+        self
+    }
+}
+
+impl<T> DgirLibrary<Absolute, T>
+where
+    T: Num + Scalar + FromPrimitive + ToPrimitive,
+{
+    pub fn save(self, filename: impl AsRef<std::path::Path>) -> Result<()> {
+        self.to_gds21_library().save(filename)
+    }
+}
+
+impl<T> DgirLibrary<Relative, T>
+where
+    T: Num + Scalar + FromPrimitive + ToPrimitive,
+{
+    pub fn save(self, filename: impl AsRef<std::path::Path>) -> Result<()> {
+        self.to_gds21_library().save(filename)
     }
 }

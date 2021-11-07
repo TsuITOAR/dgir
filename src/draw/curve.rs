@@ -1,7 +1,11 @@
-use super::{coordinate::Coordinate, Resolution};
-use crate::units::{Angle, Length, LengthType};
+use super::coordinate::Coordinate;
+use crate::{
+    color::LayerData,
+    gds::{Element, Path, Polygon, ToDgirElement},
+    units::{Length, LengthType},
+};
 use nalgebra::Scalar;
-use num::{traits::FloatConst, Float, FromPrimitive, Num, ToPrimitive};
+use num::Num;
 use std::{
     fmt::Debug,
     iter::{Chain, Fuse, FusedIterator, Iterator, Map, Rev},
@@ -24,6 +28,30 @@ impl<T: Scalar, C: Iterator<Item = Coordinate<T>>> Curve<T, C> {
             first: None,
             current: None,
         })
+    }
+}
+
+impl<L, T, C> Curve<Length<L, T>, C>
+where
+    L: LengthType,
+    T: Scalar + Num,
+    C: Iterator<Item = Coordinate<Length<L, T>>> + 'static,
+{
+    pub fn to_path(self, color: LayerData) -> Element<L, T> {
+        Path {
+            curve: Box::new(self.curve),
+            color,
+            width: None,
+        }
+        .to_dgir_element()
+    }
+    pub fn width_path(self, width: Length<L, T>, color: LayerData) -> Element<L, T> {
+        Path {
+            curve: Box::new(self.curve),
+            color,
+            width: Some(width),
+        }
+        .to_dgir_element()
     }
 }
 
@@ -143,6 +171,21 @@ impl<T: Scalar, A: Iterator<Item = Coordinate<T>>> Area<T, A> {
     }
 }
 
+impl<L, T, A> Area<Length<L, T>, A>
+where
+    L: LengthType,
+    T: Scalar + Num,
+    A: Iterator<Item = Coordinate<Length<L, T>>> + 'static,
+{
+    pub fn to_polygon(self, color: LayerData) -> Element<L, T> {
+        Polygon {
+            area: Box::new(self.area),
+            color,
+        }
+        .to_dgir_element()
+    }
+}
+
 impl<T, A> Iterator for Area<T, A>
 where
     T: Scalar,
@@ -199,53 +242,4 @@ where
                 .chain(self.bias(range.1).into_iter().rev()),
         )
     }
-}
-
-#[derive(Debug, Clone, Copy)]
-struct _Arc<S> {
-    radius: S,
-}
-
-impl<S> _Arc<S> {
-    fn new(radius: S) -> Self {
-        Self { radius }
-    }
-}
-impl<L, T> _Arc<Length<L, T>>
-where
-    L: LengthType,
-    T: Num + Float + FloatConst + Scalar + FromPrimitive,
-{
-    fn to_points(
-        self,
-        angle: (Angle<T>, Angle<T>),
-        resolution: Resolution<Length<L, T>>,
-    ) -> impl DoubleEndedIterator<Item = Coordinate<Length<L, T>>> {
-        let ang_range = (angle.1 - angle.0).to_rad();
-        let section_num = match resolution {
-            Resolution::MinNumber(n) => {
-                debug_assert!(n > 1);
-                n - 1
-            }
-            Resolution::MinDistance(d) => (ang_range.abs() * (self.radius / d).abs())
-                .to_usize()
-                .unwrap(),
-        };
-        let ang_at = move |s: usize| {
-            debug_assert!(s <= section_num);
-            ang_range / FromPrimitive::from_usize(section_num).unwrap()
-                * FromPrimitive::from_usize(s).unwrap()
-                + angle.0.to_rad()
-        };
-        (0..=section_num).into_iter().map(move |x| {
-            Coordinate::from([self.radius * ang_at(x).cos(), self.radius * ang_at(x).sin()])
-        })
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct CircularArc<S> {
-    inner: _Arc<S>,
-    center: (S, S),
-    angle: (Angle<S>, Angle<S>),
 }

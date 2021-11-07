@@ -1,6 +1,6 @@
 use core::f64;
 use std::{
-    fmt::Debug,
+    fmt::{Debug, Display},
     marker::PhantomData,
     ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign},
 };
@@ -19,6 +19,12 @@ pub trait RelativeUnit {
 pub struct Length<T: LengthType, S> {
     pub(crate) value: S,
     pub(crate) marker: PhantomData<T>,
+}
+
+impl<T: LengthType, S: Display> Display for Length<T, S> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.value)
+    }
 }
 
 impl<S> Length<Absolute, S> {
@@ -170,10 +176,10 @@ impl<U: LengthType, S: Num> Zero for Length<U, S> {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct Absolute;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct Relative;
 
 pub trait LengthType: 'static + Clone + Copy + Debug {}

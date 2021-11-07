@@ -17,6 +17,16 @@ pub trait IntoTransfer<T: Scalar, S: Iterator<Item = Coordinate<T>>> {
     fn into_transfer(self) -> Transfer<T, S>;
 }
 
+impl<T, S> IntoTransfer<T, S> for S
+where
+    T: Scalar,
+    S: Iterator<Item = Coordinate<T>>,
+{
+    fn into_transfer(self) -> Transfer<T, S> {
+        Transfer { s: self }
+    }
+}
+
 pub struct Transfer<T: Scalar, S: Iterator<Item = Coordinate<T>>> {
     s: S,
 }
