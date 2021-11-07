@@ -1,6 +1,6 @@
 use std::{iter::Map, ops::AddAssign};
 
-use nalgebra::Scalar;
+use nalgebra::{Scalar, Vector2};
 use num::{traits::FloatConst, Float, FromPrimitive, Num, Zero};
 
 use crate::units::{Absolute, Angle, Length, LengthType};
@@ -8,7 +8,6 @@ use crate::units::{Absolute, Angle, Length, LengthType};
 use self::{
     coordinate::{Coordinate, LenCo},
     curve::Bias,
-    transfer::IntoTransfer,
 };
 
 pub mod coordinate;
@@ -107,8 +106,7 @@ where
     fn into_iter(self) -> Self::IntoIter {
         self.inner
             .to_points(self.angle, self.resolution)
-            .into_transfer()
-            .translate(self.center.0, self.center.1)
+            .map(move |p| p + Vector2::from([self.center.0, self.center.1]))
     }
 }
 

@@ -19,7 +19,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     lib.push(
         cir.into_curve()
-            .width_path(1.4 * MICROMETER, LayerData::new(1, 1))
+            .to_path(LayerData::new(1, 1))
             .to_cell("cell_name"),
     );
     lib.save("test.gds").unwrap();
