@@ -3,95 +3,97 @@ use std::{
     ops::Mul,
 };
 
-use nalgebra::{ClosedAdd, RealField, Rotation2, Scalar, Similarity, Translation};
-use num::Num;
+use nalgebra::{ClosedAdd, RealField, Rotation2, Similarity, Translation};
 
-use crate::units::{Angle, Length, LengthType};
+use crate::{
+    units::{Angle, Length, LengthType},
+    Num, Quantity,
+};
 
 use super::{
     coordinate::Coordinate,
     coordinate::{LenCo, MulAsScalar},
 };
 
-pub trait IntoTransfer<T: Scalar, S: Iterator<Item = Coordinate<T>>> {
-    fn into_transfer(self) -> Transfer<T, S>;
+pub trait IntoTransfer<Q: Quantity, S: Iterator<Item = Coordinate<Q>>> {
+    fn into_transfer(self) -> Transfer<Q, S>;
 }
 
-impl<T, S> IntoTransfer<T, S> for S
+impl<Q, S> IntoTransfer<Q, S> for S
 where
-    T: Scalar,
-    S: Iterator<Item = Coordinate<T>>,
+    Q: Quantity,
+    S: Iterator<Item = Coordinate<Q>>,
 {
-    fn into_transfer(self) -> Transfer<T, S> {
+    fn into_transfer(self) -> Transfer<Q, S> {
         Transfer { s: self }
     }
 }
 
-pub struct Transfer<T: Scalar, S: Iterator<Item = Coordinate<T>>> {
+pub struct Transfer<Q: Quantity, S: Iterator<Item = Coordinate<Q>>> {
     s: S,
 }
 
-impl<T, S> Iterator for Transfer<T, S>
+impl<Q, S> Iterator for Transfer<Q, S>
 where
-    T: Scalar,
-    S: Iterator<Item = Coordinate<T>>,
+    Q: Quantity,
+    S: Iterator<Item = Coordinate<Q>>,
 {
-    type Item = Coordinate<T>;
+    type Item = Coordinate<Q>;
     fn next(&mut self) -> Option<Self::Item> {
         self.s.next()
     }
 }
 
-impl<T, S> DoubleEndedIterator for Transfer<T, S>
+impl<Q, S> DoubleEndedIterator for Transfer<Q, S>
 where
-    T: Scalar,
-    S: DoubleEndedIterator<Item = Coordinate<T>>,
+    Q: Quantity,
+    S: DoubleEndedIterator<Item = Coordinate<Q>>,
 {
     fn next_back(&mut self) -> Option<Self::Item> {
         self.s.next_back()
     }
 }
 
-impl<T, S> ExactSizeIterator for Transfer<T, S>
+impl<Q, S> ExactSizeIterator for Transfer<Q, S>
 where
-    T: Scalar,
-    S: ExactSizeIterator<Item = Coordinate<T>>,
+    Q: Quantity,
+    S: ExactSizeIterator<Item = Coordinate<Q>>,
 {
     fn len(&self) -> usize {
         self.s.len()
     }
 }
 
-impl<T: Scalar, S> FusedIterator for Transfer<T, S> where S: FusedIterator<Item = Coordinate<T>> {}
+impl<Q: Quantity, S> FusedIterator for Transfer<Q, S> where S: FusedIterator<Item = Coordinate<Q>> {}
 
-impl<T: Scalar, S: Iterator<Item = Coordinate<T>>> Transfer<T, S> {
+impl<Q: Quantity, S: Iterator<Item = Coordinate<Q>>> Transfer<Q, S> {
     pub fn new(s: S) -> Self {
         Self { s }
     }
     pub fn into_inner(self) -> S {
         self.s
     }
-    pub fn transfer<F: FnMut(Coordinate<T>) -> Coordinate<T>>(
+    pub fn transfer<F: FnMut(Coordinate<Q>) -> Coordinate<Q>>(
         self,
         f: F,
-    ) -> Transfer<T, Map<S, F>> {
+    ) -> Transfer<Q, Map<S, F>> {
         Transfer::new(self.s.map(f))
     }
     pub fn matrix_trans<M>(
         self,
         m: M,
-    ) -> Transfer<T, Map<S, impl FnMut(Coordinate<T>) -> Coordinate<T>>>
+    ) -> Transfer<Q, Map<S, impl FnMut(Coordinate<Q>) -> Coordinate<Q>>>
     where
-        M: Mul<Coordinate<T>, Output = Coordinate<T>> + Copy,
+        M: Mul<Coordinate<Q>, Output = Coordinate<Q>> + Copy,
     {
-        self.transfer(move |s: Coordinate<T>| -> Coordinate<T> { m * s })
+        self.transfer(move |s: Coordinate<Q>| -> Coordinate<Q> { m * s })
     }
 }
 
 impl<L, T, S> Transfer<Length<L, T>, S>
 where
     L: LengthType,
-    T: Scalar + Num,
+    T: Num,
     S: Iterator<Item = LenCo<L, T>>,
 {
     pub fn translate(

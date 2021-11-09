@@ -1,12 +1,12 @@
 use std::{collections::BTreeSet, fmt::Debug, rc::Rc};
 
-use nalgebra::Scalar;
-use num::{FromPrimitive, Num, ToPrimitive, Zero};
+use num::{FromPrimitive, ToPrimitive, Zero};
 
 use crate::{
     color::LayerData,
     draw::coordinate::{Coordinate, LenCo},
     units::{Absolute, Length, LengthType, Relative},
+    Num,
 };
 
 use self::togds::ToGds21Library;
@@ -17,7 +17,7 @@ pub mod togds;
 type Result<T> = gds21::GdsResult<T>;
 type Points<L, T> = Box<dyn Iterator<Item = LenCo<L, T>>>;
 
-pub struct Path<L: LengthType, T: Num + Scalar> {
+pub struct Path<L: LengthType, T: Num> {
     pub curve: Points<L, T>,
     pub color: LayerData,
     pub width: Option<Length<L, T>>,
@@ -26,7 +26,7 @@ pub struct Path<L: LengthType, T: Num + Scalar> {
 impl<L, T> Debug for Path<L, T>
 where
     L: LengthType,
-    T: Num + Scalar,
+    T: Num,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -37,7 +37,7 @@ where
     }
 }
 
-pub struct Polygon<L: LengthType, T: Num + Scalar> {
+pub struct Polygon<L: LengthType, T: Num> {
     pub area: Points<L, T>,
     pub color: LayerData,
 }
@@ -45,7 +45,7 @@ pub struct Polygon<L: LengthType, T: Num + Scalar> {
 impl<L, T> Debug for Polygon<L, T>
 where
     L: LengthType,
-    T: Num + Scalar,
+    T: Num,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Path {{ curve: ..., (layer, datatype): {}}}", self.color)
@@ -56,7 +56,7 @@ where
 pub struct Ref<L, T>
 where
     L: LengthType,
-    T: Num + Scalar,
+    T: Num,
 {
     pub(crate) strans: Option<gds21::GdsStrans>,
     pub(crate) pos: Coordinate<Length<L, T>>,
@@ -68,7 +68,7 @@ where
 pub enum Element<L, T>
 where
     L: LengthType,
-    T: Num + Scalar,
+    T: Num,
 {
     Path(Path<L, T>),
     Polygon(Polygon<L, T>),
@@ -78,7 +78,7 @@ where
 impl<L, T> Element<L, T>
 where
     L: LengthType,
-    T: Num + Scalar,
+    T: Num,
 {
     pub fn to_cell<S: ToString>(self, name: S) -> DgirCell<L, T> {
         DgirCell {
@@ -91,7 +91,7 @@ where
 pub trait ToDgirElement<L, T>
 where
     L: LengthType,
-    T: Num + Scalar,
+    T: Num,
 {
     fn to_dgir_element(self) -> Element<L, T>;
 }
@@ -99,7 +99,7 @@ where
 impl<F, L, T> ToDgirElement<L, T> for F
 where
     L: LengthType,
-    T: Num + Scalar,
+    T: Num,
     F: Into<Element<L, T>>,
 {
     fn to_dgir_element(self) -> Element<L, T> {
@@ -110,7 +110,7 @@ where
 impl<L, T> From<Path<L, T>> for Element<L, T>
 where
     L: LengthType,
-    T: Num + Scalar,
+    T: Num,
 {
     fn from(p: Path<L, T>) -> Self {
         Element::Path(p)
@@ -120,7 +120,7 @@ where
 impl<L, T> From<Polygon<L, T>> for Element<L, T>
 where
     L: LengthType,
-    T: Num + Scalar,
+    T: Num,
 {
     fn from(p: Polygon<L, T>) -> Self {
         Element::Polygon(p)
@@ -130,7 +130,7 @@ where
 impl<L, T> From<Ref<L, T>> for Element<L, T>
 where
     L: LengthType,
-    T: Num + Scalar,
+    T: Num,
 {
     fn from(r: Ref<L, T>) -> Self {
         Element::Ref(r)
@@ -141,7 +141,7 @@ where
 pub struct DgirCell<L, T>
 where
     L: LengthType,
-    T: Num + Scalar,
+    T: Num,
 {
     pub name: String,
     pub(crate) elements: Vec<Element<L, T>>,
@@ -150,7 +150,7 @@ where
 impl<L, T> DgirCell<L, T>
 where
     L: LengthType,
-    T: Num + Scalar,
+    T: Num,
 {
     pub fn new(name: impl Into<String>) -> Self {
         Self {
@@ -192,9 +192,7 @@ where
     }
 }
 
-fn is_sub_dependencies_empty<L: LengthType, T: Scalar + Num>(
-    set: &BTreeSet<Rc<DgirCell<L, T>>>,
-) -> bool {
+fn is_sub_dependencies_empty<L: LengthType, T: Num>(set: &BTreeSet<Rc<DgirCell<L, T>>>) -> bool {
     set.iter().all(|c| {
         c.elements.iter().all(|e| match e {
             Element::Ref(Ref {
@@ -208,7 +206,7 @@ fn is_sub_dependencies_empty<L: LengthType, T: Scalar + Num>(
 impl<L, T> PartialEq for DgirCell<L, T>
 where
     L: LengthType,
-    T: Num + Scalar,
+    T: Num,
 {
     fn eq(&self, other: &Self) -> bool {
         self.name.eq(&other.name)
@@ -217,14 +215,14 @@ where
 impl<L, T> Eq for DgirCell<L, T>
 where
     L: LengthType,
-    T: Num + Scalar,
+    T: Num,
 {
 }
 
 impl<L, T> PartialOrd for DgirCell<L, T>
 where
     L: LengthType,
-    T: Num + Scalar,
+    T: Num,
 {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         self.name.partial_cmp(&other.name)
@@ -233,7 +231,7 @@ where
 impl<L, T> Ord for DgirCell<L, T>
 where
     L: LengthType,
-    T: Num + Scalar,
+    T: Num,
 {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.name.cmp(&other.name)
@@ -243,7 +241,7 @@ where
 impl<L, T> AsRef<Vec<Element<L, T>>> for DgirCell<L, T>
 where
     L: LengthType,
-    T: Num + Scalar,
+    T: Num,
 {
     fn as_ref(&self) -> &Vec<Element<L, T>> {
         &self.elements
@@ -253,7 +251,7 @@ where
 impl<L, T> AsMut<Vec<Element<L, T>>> for DgirCell<L, T>
 where
     L: LengthType,
-    T: Num + Scalar,
+    T: Num,
 {
     fn as_mut(&mut self) -> &mut Vec<Element<L, T>> {
         &mut self.elements
@@ -263,7 +261,7 @@ where
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct DgirUnits<T>
 where
-    T: Num + Scalar,
+    T: Num,
 {
     database: Length<Absolute, T>,
     user: Length<Absolute, T>,
@@ -271,7 +269,7 @@ where
 
 impl<T> Default for DgirUnits<T>
 where
-    T: Num + Scalar + FromPrimitive,
+    T: Num + FromPrimitive,
 {
     fn default() -> Self {
         Self {
@@ -285,7 +283,7 @@ where
 pub struct DgirLibrary<L = Absolute, T = f64>
 where
     L: LengthType,
-    T: Num + Scalar + FromPrimitive,
+    T: Num + FromPrimitive,
 {
     pub name: Option<String>,
     pub(crate) units: DgirUnits<T>,
@@ -295,7 +293,7 @@ where
 impl<L, T> Default for DgirLibrary<L, T>
 where
     L: LengthType,
-    T: Num + Scalar + FromPrimitive,
+    T: Num + FromPrimitive,
 {
     fn default() -> Self {
         Self {
@@ -309,7 +307,7 @@ where
 impl<L, T> DgirLibrary<L, T>
 where
     L: LengthType,
-    T: Num + Scalar + FromPrimitive,
+    T: Num + FromPrimitive,
 {
     pub fn new<S: ToString>(name: S) -> Self {
         Self {
@@ -333,7 +331,7 @@ where
 
 impl<T> DgirLibrary<Absolute, T>
 where
-    T: Num + Scalar + FromPrimitive + ToPrimitive,
+    T: Num + FromPrimitive + ToPrimitive,
 {
     pub fn save(self, filename: impl AsRef<std::path::Path>) -> Result<()> {
         self.to_gds21_library().save(filename)
@@ -342,7 +340,7 @@ where
 
 impl<T> DgirLibrary<Relative, T>
 where
-    T: Num + Scalar + FromPrimitive + ToPrimitive,
+    T: Num + FromPrimitive + ToPrimitive,
 {
     pub fn save(self, filename: impl AsRef<std::path::Path>) -> Result<()> {
         self.to_gds21_library().save(filename)

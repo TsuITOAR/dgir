@@ -1,9 +1,12 @@
 use std::{iter::Map, ops::AddAssign};
 
-use nalgebra::{Scalar, Vector2};
-use num::{traits::FloatConst, Float, FromPrimitive, Num, Zero};
+use nalgebra::Vector2;
+use num::{traits::FloatConst, Float, FromPrimitive, Zero};
 
-use crate::units::{Absolute, Angle, Length, LengthType};
+use crate::{
+    units::{Absolute, Angle, Length, LengthType},
+    Num,
+};
 
 use self::{
     coordinate::{Coordinate, LenCo},
@@ -28,7 +31,7 @@ struct _Arc<S> {
 impl<L, T> _Arc<Length<L, T>>
 where
     L: LengthType,
-    T: Num + Float + FloatConst + Scalar + FromPrimitive,
+    T: Float + FloatConst + Num + FromPrimitive,
 {
     fn to_points(
         self,
@@ -61,7 +64,7 @@ where
 pub struct CircularArc<L = Absolute, T = f64>
 where
     L: LengthType,
-    T: Scalar + Num,
+    T: Num,
 {
     inner: _Arc<Length<L, T>>,
     center: (Length<L, T>, Length<L, T>),
@@ -72,7 +75,7 @@ where
 impl<L, T> CircularArc<L, T>
 where
     L: LengthType,
-    T: Scalar + Num,
+    T: Num,
 {
     pub fn new(
         radius: Length<L, T>,
@@ -99,7 +102,7 @@ where
 impl<L, T> IntoIterator for CircularArc<L, T>
 where
     L: LengthType,
-    T: Num + Float + FloatConst + Scalar + FromPrimitive + AddAssign,
+    T: Float + FloatConst + Num + FromPrimitive + AddAssign,
 {
     type IntoIter = impl DoubleEndedIterator<Item = LenCo<L, T>>;
     type Item = LenCo<L, T>;
@@ -113,7 +116,7 @@ where
 impl<L, T> Bias<Length<L, T>> for CircularArc<L, T>
 where
     L: LengthType,
-    T: Num + Float + FloatConst + Scalar + FromPrimitive + AddAssign,
+    T: Float + FloatConst + Num + FromPrimitive + AddAssign,
 {
     fn bias(self, b: Length<L, T>) -> Self {
         Self {

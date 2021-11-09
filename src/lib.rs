@@ -1,15 +1,41 @@
 #![feature(type_alias_impl_trait)]
+use ::num::Signed;
 use gds21::GdsPoint;
 use log::warn;
-use nalgebra::Scalar;
-use num::Num;
-use std::marker::PhantomData;
+use std::{fmt::Debug, marker::PhantomData, ops::Neg};
 use units::{AbsoluteLength, Length, LengthType};
 
 pub mod color;
 pub mod draw;
 pub mod gds;
 pub mod units;
+
+pub trait Num:
+    'static
+    + Copy
+    + Debug
+    + PartialOrd
+    + num::traits::NumAssignRef
+    + num::traits::Signed
+    + num::traits::ToPrimitive
+{
+}
+
+impl<T> Num for T where
+    T: 'static
+        + Copy
+        + Debug
+        + PartialOrd
+        + num::traits::NumAssignRef
+        + num::traits::Signed
+        + num::traits::ToPrimitive
+{
+}
+
+pub trait Quantity: 'static + Clone + Debug + Neg + num::Zero + PartialEq + PartialOrd {}
+
+impl<T> Quantity for T where T: 'static + Clone + Debug + Neg + num::Zero + PartialEq + PartialOrd {}
+
 const MAX_POINTS_NUM: usize = 8191;
 
 pub const NANOMETER: AbsoluteLength<f64> = AbsoluteLength::<f64> {
@@ -37,7 +63,7 @@ pub const METER: AbsoluteLength<f64> = AbsoluteLength::<f64> {
     marker: PhantomData,
 };
 
-pub fn zero<L: LengthType, T: Scalar + Num>() -> Length<L, T> {
+pub fn zero<L: LengthType, T: Num>() -> Length<L, T> {
     Length {
         value: num::Zero::zero(),
         marker: PhantomData,

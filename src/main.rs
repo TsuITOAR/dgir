@@ -2,7 +2,7 @@ use std::time::Instant;
 
 use dgir::{
     color::LayerData,
-    draw::{curve::IntoCurve, CircularArc, Resolution},
+    draw::{curve::iter::IntoCurve, CircularArc, Resolution},
     gds::DgirLibrary,
     units::Angle,
     zero, MICROMETER,

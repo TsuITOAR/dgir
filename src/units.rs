@@ -5,7 +5,10 @@ use std::{
     ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign},
 };
 
-use num::{traits::FloatConst, Float, FromPrimitive, Num, Zero};
+use num::{
+    traits::{FloatConst, NumRef},
+    Float, FromPrimitive, Num, Zero,
+};
 
 pub trait AbsoluteUnit {
     const CONVERSION_FACTOR: f64;
@@ -55,7 +58,7 @@ impl<T: LengthType, S: Neg<Output = S>> Neg for Length<T, S> {
     type Output = Length<T, S>;
     fn neg(self) -> Self::Output {
         Length::<T, S> {
-            value: -self.value,
+            value: self.value.neg(),
             marker: PhantomData,
         }
     }
@@ -148,6 +151,97 @@ impl<T: LengthType, S: Num> Div<S> for Length<T, S> {
 
 impl<T: LengthType, S: Num + DivAssign> DivAssign<S> for Length<T, S> {
     fn div_assign(&mut self, rhs: S) {
+        self.value /= rhs;
+    }
+}
+
+impl<'a, T: LengthType, S: NumRef> Add<&'a Length<T, S>> for Length<T, S> {
+    type Output = Length<T, S>;
+    fn add(self, rhs: &'a Length<T, S>) -> Self::Output {
+        Self {
+            value: self.value + &rhs.value,
+            marker: self.marker,
+        }
+    }
+}
+
+impl<'a, T: LengthType, S: for<'r> AddAssign<&'r S>> AddAssign<&'a Length<T, S>> for Length<T, S> {
+    fn add_assign(&mut self, rhs: &'a Length<T, S>) {
+        self.value += &rhs.value;
+    }
+}
+
+impl<'a, T: LengthType, S: NumRef> Sub<&'a Length<T, S>> for Length<T, S> {
+    type Output = Length<T, S>;
+    fn sub(self, rhs: &'a Length<T, S>) -> Self::Output {
+        Self {
+            value: self.value - &rhs.value,
+            marker: self.marker,
+        }
+    }
+}
+
+impl<'a, T: LengthType, S: for<'r> SubAssign<&'r S>> SubAssign<&'a Length<T, S>> for Length<T, S> {
+    fn sub_assign(&mut self, rhs: &'a Length<T, S>) {
+        self.value -= &rhs.value;
+    }
+}
+
+impl<'a, T: LengthType, S: NumRef> Mul<&'a S> for Length<T, S> {
+    type Output = Length<T, S>;
+    fn mul(self, rhs: &'a S) -> Self::Output {
+        Self {
+            value: self.value * rhs,
+            marker: PhantomData,
+        }
+    }
+}
+
+impl<'a, T: LengthType> Mul<&'a Length<T, f64>> for f64 {
+    type Output = Length<T, f64>;
+    fn mul(self, rhs: &'a Length<T, f64>) -> Self::Output {
+        Self::Output {
+            value: self * rhs.value,
+            marker: PhantomData,
+        }
+    }
+}
+
+impl<'a, T: LengthType> Mul<&'a Length<T, f32>> for f32 {
+    type Output = Length<T, f32>;
+    fn mul(self, rhs: &'a Length<T, f32>) -> Self::Output {
+        Self::Output {
+            value: self * rhs.value,
+            marker: PhantomData,
+        }
+    }
+}
+
+impl<'a, T: LengthType, S: for<'r> MulAssign<&'r S>> MulAssign<&'a S> for Length<T, S> {
+    fn mul_assign(&mut self, rhs: &'a S) {
+        self.value *= rhs;
+    }
+}
+
+impl<'a, T: LengthType, S: NumRef> Div<&'a Length<T, S>> for Length<T, S> {
+    type Output = S;
+    fn div(self, rhs: &'a Length<T, S>) -> Self::Output {
+        self.value / &rhs.value
+    }
+}
+
+impl<'a, T: LengthType, S: NumRef> Div<&'a S> for Length<T, S> {
+    type Output = Length<T, S>;
+    fn div(self, rhs: &'a S) -> Self::Output {
+        Self {
+            value: self.value / rhs,
+            marker: self.marker,
+        }
+    }
+}
+
+impl<'a, T: LengthType, S: for<'r> DivAssign<&'r S>> DivAssign<&'a S> for Length<T, S> {
+    fn div_assign(&mut self, rhs: &'a S) {
         self.value /= rhs;
     }
 }
@@ -296,7 +390,7 @@ impl<S: Div<Output = S>> Div<S> for Angle<S> {
 impl<S: Neg<Output = S>> Neg for Angle<S> {
     type Output = Angle<S>;
     fn neg(self) -> Self::Output {
-        Angle::<S>(-self.0)
+        Angle::<S>(self.0.neg())
     }
 }
 

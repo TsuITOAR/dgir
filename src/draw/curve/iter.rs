@@ -1,40 +1,38 @@
-use super::coordinate::Coordinate;
+use std::iter::{Chain, Fuse, FusedIterator, Map, Rev};
+
+use crate::Num;
+
 use crate::{
     color::LayerData,
+    draw::coordinate::Coordinate,
     gds::{Element, Path, Polygon, ToDgirElement},
     units::{Length, LengthType},
+    Quantity,
 };
-use nalgebra::Scalar;
-use num::Num;
-use std::{
-    fmt::Debug,
-    iter::{Chain, Fuse, FusedIterator, Iterator, Map, Rev},
-};
-pub struct Curve<T: Scalar, C: Iterator<Item = Coordinate<T>>> {
-    curve: C,
-}
 
-impl<T: Scalar, C: Iterator<Item = Coordinate<T>>> Curve<T, C> {
+use super::{Area, Bias, Curve, Sweep};
+
+impl<T: Num, C: Iterator<Item = Coordinate<T>>> Curve<C> {
     pub fn new(curve: C) -> Self {
         Self { curve }
     }
-    pub fn close(self) -> Area<T, Close<T, Fuse<Self>>>
+    pub fn close(self) -> Area<Close<T, Fuse<C>>>
     where
         T: Copy + PartialEq,
         C: Iterator<Item = Coordinate<T>>,
     {
         Area::new(Close {
-            curve: self.fuse(),
+            curve: self.curve.fuse(),
             first: None,
             current: None,
         })
     }
 }
 
-impl<L, T, C> Curve<Length<L, T>, C>
+impl<L, T, C> Curve<C>
 where
     L: LengthType,
-    T: Scalar + Num,
+    T: Num,
     C: Iterator<Item = Coordinate<Length<L, T>>> + 'static,
 {
     pub fn to_path(self, color: LayerData) -> Element<L, T> {
@@ -56,13 +54,13 @@ where
 }
 
 #[derive(Debug, Clone)]
-pub struct Close<T: Scalar, C: FusedIterator<Item = Coordinate<T>>> {
+pub struct Close<T: Quantity, C: FusedIterator<Item = Coordinate<T>>> {
     curve: C,
     first: Option<C::Item>,
     current: Option<C::Item>,
 }
 
-impl<T: Scalar, C: FusedIterator<Item = Coordinate<T>>> Iterator for Close<T, C> {
+impl<T: Quantity, C: FusedIterator<Item = Coordinate<T>>> Iterator for Close<T, C> {
     type Item = C::Item;
     fn next(&mut self) -> Option<Self::Item> {
         if let None = self.current {
@@ -104,77 +102,73 @@ fn close_curve() {
     assert_eq!(it2.clone().into_curve().close().count(), c2.len());
 }
 
-impl<T, C> Iterator for Curve<T, C>
+impl<Q, C> Iterator for Curve<C>
 where
-    T: Scalar,
-    C: Iterator<Item = Coordinate<T>>,
+    Q: Quantity,
+    C: Iterator<Item = Coordinate<Q>>,
 {
-    type Item = Coordinate<T>;
+    type Item = Coordinate<Q>;
     fn next(&mut self) -> Option<Self::Item> {
         self.curve.next()
     }
 }
 
-impl<T, C> DoubleEndedIterator for Curve<T, C>
+impl<Q, C> DoubleEndedIterator for Curve<C>
 where
-    T: Scalar,
-    C: DoubleEndedIterator<Item = Coordinate<T>>,
+    Q: Quantity,
+    C: DoubleEndedIterator<Item = Coordinate<Q>>,
 {
     fn next_back(&mut self) -> Option<Self::Item> {
         self.curve.next_back()
     }
 }
 
-impl<T, C> ExactSizeIterator for Curve<T, C>
+impl<Q, C> ExactSizeIterator for Curve<C>
 where
-    T: Scalar,
-    C: ExactSizeIterator<Item = Coordinate<T>>,
+    Q: Quantity,
+    C: ExactSizeIterator<Item = Coordinate<Q>>,
 {
     fn len(&self) -> usize {
         self.curve.len()
     }
 }
 
-impl<T, C> FusedIterator for Curve<T, C>
+impl<Q, C> FusedIterator for Curve<C>
 where
-    T: Scalar,
-    C: FusedIterator<Item = Coordinate<T>>,
+    Q: Quantity,
+    C: FusedIterator<Item = Coordinate<Q>>,
 {
 }
 
-pub trait IntoCurve<T: Scalar> {
+pub trait IntoCurve<T: Quantity> {
     type Curve: Iterator<Item = Coordinate<T>>;
-    fn into_curve(self) -> Curve<T, Self::Curve>;
+    fn into_curve(self) -> Curve<Self::Curve>;
 }
 
-impl<T, C, S> IntoCurve<T> for C
+impl<Q, C, S> IntoCurve<Q> for C
 where
-    T: Scalar,
+    Q: Quantity,
     C: IntoIterator<Item = S>,
-    S: Into<Coordinate<T>>,
+    S: Into<Coordinate<Q>>,
 {
-    type Curve = Map<C::IntoIter, fn(S) -> Coordinate<T>>;
-    fn into_curve(self) -> Curve<T, Self::Curve> {
+    type Curve = Map<C::IntoIter, fn(S) -> Coordinate<Q>>;
+    fn into_curve(self) -> Curve<Self::Curve> {
         Curve {
             curve: self.into_iter().map(|x| x.into()),
         }
     }
 }
 
-pub struct Area<T: Scalar, A: Iterator<Item = Coordinate<T>>> {
-    area: A,
-}
-
-impl<T: Scalar, A: Iterator<Item = Coordinate<T>>> Area<T, A> {
+impl<Q: Quantity, A: Iterator<Item = Coordinate<Q>>> Area<A> {
     pub fn new(area: A) -> Self {
         Self { area }
     }
 }
 
-impl<L, T, A> Area<Length<L, T>, A>
+impl<L, T, A> Area<A>
 where
     L: LengthType,
-    T: Scalar + Num,
+    T: Num,
     A: Iterator<Item = Coordinate<Length<L, T>>> + 'static,
 {
     pub fn to_polygon(self, color: LayerData) -> Element<L, T> {
@@ -186,55 +180,47 @@ where
     }
 }
 
-impl<T, A> Iterator for Area<T, A>
+impl<Q, A> Iterator for Area<A>
 where
-    T: Scalar,
-    A: Iterator<Item = Coordinate<T>>,
+    Q: Quantity,
+    A: Iterator<Item = Coordinate<Q>>,
 {
-    type Item = Coordinate<T>;
+    type Item = Coordinate<Q>;
     fn next(&mut self) -> Option<Self::Item> {
         self.area.next()
     }
 }
 
-impl<T, A> DoubleEndedIterator for Area<T, A>
+impl<Q, A> DoubleEndedIterator for Area<A>
 where
-    T: Scalar,
-    A: DoubleEndedIterator<Item = Coordinate<T>>,
+    Q: Quantity,
+    A: DoubleEndedIterator<Item = Coordinate<Q>>,
 {
     fn next_back(&mut self) -> Option<Self::Item> {
         self.area.next_back()
     }
 }
 
-impl<T, A> ExactSizeIterator for Area<T, A>
+impl<Q, A> ExactSizeIterator for Area<A>
 where
-    T: Scalar,
-    A: ExactSizeIterator<Item = Coordinate<T>>,
+    Q: Quantity,
+    A: ExactSizeIterator<Item = Coordinate<Q>>,
 {
     fn len(&self) -> usize {
         self.area.len()
     }
 }
 
-impl<T: Scalar, A> FusedIterator for Area<T, A> where A: FusedIterator<Item = Coordinate<T>> {}
-pub trait Sweep<T: Scalar> {
-    type Output: Iterator<Item = Coordinate<T>>;
-    fn sweep(self, range: (T, T)) -> Area<T, Self::Output>;
-}
+impl<Q: Quantity, A> FusedIterator for Area<A> where A: FusedIterator<Item = Coordinate<Q>> {}
 
-pub trait Bias<T: Scalar>: IntoIterator<Item = Coordinate<T>> {
-    fn bias(self, b: T) -> Self;
-}
-
-impl<C, T> Sweep<T> for C
+impl<C, Q> Sweep<Q> for C
 where
-    T: Scalar,
-    C: Bias<T> + Clone,
+    Q: Quantity,
+    C: Bias<Q> + Clone,
     <C as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
     type Output = Chain<C::IntoIter, Rev<C::IntoIter>>;
-    fn sweep(self, range: (T, T)) -> Area<T, Self::Output> {
+    fn sweep(self, range: (Q, Q)) -> Area<Self::Output> {
         Area::new(
             self.clone()
                 .bias(range.0)
