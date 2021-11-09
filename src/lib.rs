@@ -1,5 +1,4 @@
 #![feature(type_alias_impl_trait)]
-use ::num::Signed;
 use gds21::GdsPoint;
 use log::warn;
 use std::{fmt::Debug, marker::PhantomData, ops::Neg};
