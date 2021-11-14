@@ -1,7 +1,8 @@
 use std::{iter::Map, ops::AddAssign};
 
+use log::warn;
 use nalgebra::Vector2;
-use num::{traits::FloatConst, Float, FromPrimitive, Zero};
+use num::{traits::FloatConst, Float, FromPrimitive, ToPrimitive, Zero};
 
 use crate::{
     units::{Absolute, Angle, Length, LengthType},
@@ -10,7 +11,7 @@ use crate::{
 
 use self::{
     coordinate::{Coordinate, LenCo},
-    curve::Bias,
+    curve::{Bias, Split},
 };
 
 pub mod coordinate;
@@ -118,12 +119,59 @@ where
     L: LengthType,
     T: Float + FloatConst + Num + FromPrimitive + AddAssign,
 {
-    fn bias(self, b: Length<L, T>) -> Self {
-        Self {
-            inner: _Arc {
-                radius: self.inner.radius + b,
-            },
-            ..self
+    fn bias(&mut self, b: Length<L, T>) -> &mut Self {
+        self.inner.radius += b;
+        self
+    }
+}
+
+impl<L, T> Split<Angle<T>> for CircularArc<L, T>
+where
+    L: LengthType,
+    T: Num + FromPrimitive + ToPrimitive,
+{
+    fn split(self, pos: Angle<T>) -> (Self, Self) {
+        if (pos > self.angle.0 && pos > self.angle.1) || (pos < self.angle.0 && pos < self.angle.1)
+        {
+            warn!(
+                "split position at {}, but the original arc start at {}, end at {}",
+                pos, self.angle.0, self.angle.1
+            );
         }
+        let (res_left, res_right) = match self.resolution {
+            Resolution::MinDistance(d) => (Resolution::MinDistance(d), Resolution::MinDistance(d)),
+            Resolution::MinNumber(n) => {
+                let min_dis: Length<L, T> = (self.inner.radius
+                    * (self.angle.1 - self.angle.0).to_rad().abs())
+                    / T::from_usize(n).unwrap();
+                (
+                    Resolution::MinDistance(min_dis),
+                    Resolution::MinDistance(min_dis),
+                )
+            }
+        };
+        (
+            Self {
+                angle: (self.angle.0, self.angle.0 + pos),
+                resolution: res_left,
+                ..self
+            },
+            Self {
+                angle: (self.angle.0 + pos, self.angle.1),
+                resolution: res_right,
+                ..self
+            },
+        )
+    }
+}
+
+impl<L, T> Split<Length<L, T>> for CircularArc<L, T>
+where
+    L: LengthType,
+    T: Num + Float + FloatConst + FromPrimitive,
+{
+    fn split(self, pos: Length<L, T>) -> (Self, Self) {
+        let angle = Angle::from_deg(pos / self.inner.radius);
+        self.split(angle)
     }
 }

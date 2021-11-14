@@ -1,7 +1,11 @@
 #![feature(type_alias_impl_trait)]
 use gds21::GdsPoint;
 use log::warn;
-use std::{fmt::Debug, marker::PhantomData, ops::Neg};
+use std::{
+    fmt::{Debug, Display},
+    marker::PhantomData,
+    ops::Neg,
+};
 use units::{AbsoluteLength, Length, LengthType};
 
 pub mod color;
@@ -13,6 +17,7 @@ pub trait Num:
     'static
     + Copy
     + Debug
+    + Display
     + PartialOrd
     + num::traits::NumAssignRef
     + num::traits::Signed
@@ -24,6 +29,7 @@ impl<T> Num for T where
     T: 'static
         + Copy
         + Debug
+        + Display
         + PartialOrd
         + num::traits::NumAssignRef
         + num::traits::Signed

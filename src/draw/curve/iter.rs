@@ -1,16 +1,17 @@
-use std::iter::{Chain, Fuse, FusedIterator, Map, Rev};
+use std::iter::{Fuse, FusedIterator, Rev};
 
 use crate::Num;
 
 use crate::{
     color::LayerData,
     draw::coordinate::Coordinate,
-    gds::{Element, Path, Polygon, ToDgirElement},
+    gds::{Element, Path, Polygon},
     units::{Length, LengthType},
     Quantity,
 };
 
-use super::{Area, Bias, Curve, Sweep};
+use super::groups::Compound;
+use super::{Area, Bias, Curve, IntoArea, IntoCurve, Sweep};
 
 impl<T: Num, C: Iterator<Item = Coordinate<T>>> Curve<C> {
     pub fn new(curve: C) -> Self {
@@ -21,11 +22,12 @@ impl<T: Num, C: Iterator<Item = Coordinate<T>>> Curve<C> {
         T: Copy + PartialEq,
         C: Iterator<Item = Coordinate<T>>,
     {
-        Area::new(Close {
+        Close {
             curve: self.curve.fuse(),
             first: None,
             current: None,
-        })
+        }
+        .into_area()
     }
 }
 
@@ -41,7 +43,7 @@ where
             color,
             width: None,
         }
-        .to_dgir_element()
+        .into()
     }
     pub fn width_path(self, width: Length<L, T>, color: LayerData) -> Element<L, T> {
         Path {
@@ -49,7 +51,7 @@ where
             color,
             width: Some(width),
         }
-        .to_dgir_element()
+        .into()
     }
 }
 
@@ -81,6 +83,18 @@ impl<T: Quantity, C: FusedIterator<Item = Coordinate<T>>> Iterator for Close<T, 
     }
 }
 
+impl<Q, C> IntoArea for Close<Q, C>
+where
+    Q: Quantity,
+    C: FusedIterator<Item = Coordinate<Q>>,
+{
+    type Q = Q;
+    type Area = Self;
+    fn into_area(self) -> Area<Self::Area> {
+        Area { area: self }
+    }
+}
+
 #[test]
 fn close_curve() {
     fn to_coordinate(a: f64) -> Coordinate<f64> {
@@ -89,79 +103,48 @@ fn close_curve() {
     let c1 = vec![1., 2., 3.];
     let it1 = c1.iter().map(|x| to_coordinate(*x));
     assert_eq!(
-        it1.clone().into_curve().close().last(),
+        it1.clone().into_curve().close().into_iter().last(),
         to_coordinate(1.).into()
     );
-    assert_eq!(it1.clone().into_curve().close().count(), c1.len() + 1);
+    assert_eq!(
+        it1.clone().into_curve().close().into_iter().count(),
+        c1.len() + 1
+    );
     let c2 = vec![1., 1., 1.];
     let it2 = c2.iter().map(|x| to_coordinate(*x));
     assert_eq!(
-        it2.clone().into_curve().close().last(),
+        it2.clone().into_curve().close().into_iter().last(),
         to_coordinate(1.).into()
     );
-    assert_eq!(it2.clone().into_curve().close().count(), c2.len());
+    assert_eq!(
+        it2.clone().into_curve().close().into_iter().count(),
+        c2.len()
+    );
 }
 
-impl<Q, C> Iterator for Curve<C>
+impl<Q, C> IntoIterator for Curve<C>
 where
     Q: Quantity,
-    C: Iterator<Item = Coordinate<Q>>,
+    C: IntoIterator<Item = Coordinate<Q>>,
 {
+    type IntoIter = C::IntoIter;
     type Item = Coordinate<Q>;
-    fn next(&mut self) -> Option<Self::Item> {
-        self.curve.next()
+    fn into_iter(self) -> Self::IntoIter {
+        self.curve.into_iter()
     }
 }
 
-impl<Q, C> DoubleEndedIterator for Curve<C>
+impl<Q, C> IntoCurve for C
 where
     Q: Quantity,
-    C: DoubleEndedIterator<Item = Coordinate<Q>>,
+    C: IntoIterator<Item = Coordinate<Q>>,
 {
-    fn next_back(&mut self) -> Option<Self::Item> {
-        self.curve.next_back()
-    }
-}
-
-impl<Q, C> ExactSizeIterator for Curve<C>
-where
-    Q: Quantity,
-    C: ExactSizeIterator<Item = Coordinate<Q>>,
-{
-    fn len(&self) -> usize {
-        self.curve.len()
-    }
-}
-
-impl<Q, C> FusedIterator for Curve<C>
-where
-    Q: Quantity,
-    C: FusedIterator<Item = Coordinate<Q>>,
-{
-}
-
-pub trait IntoCurve<T: Quantity> {
-    type Curve: Iterator<Item = Coordinate<T>>;
-    fn into_curve(self) -> Curve<Self::Curve>;
-}
-
-impl<Q, C, S> IntoCurve<Q> for C
-where
-    Q: Quantity,
-    C: IntoIterator<Item = S>,
-    S: Into<Coordinate<Q>>,
-{
-    type Curve = Map<C::IntoIter, fn(S) -> Coordinate<Q>>;
+    type Q = Q;
+    type Curve = C::IntoIter;
     fn into_curve(self) -> Curve<Self::Curve> {
         Curve {
-            curve: self.into_iter().map(|x| x.into()),
+            curve: self.into_iter(),
         }
-    }
-}
-
-impl<Q: Quantity, A: Iterator<Item = Coordinate<Q>>> Area<A> {
-    pub fn new(area: A) -> Self {
-        Self { area }
     }
 }
 
@@ -176,42 +159,21 @@ where
             area: Box::new(self.area),
             color,
         }
-        .to_dgir_element()
+        .into()
     }
 }
 
-impl<Q, A> Iterator for Area<A>
+impl<Q, A> IntoIterator for Area<A>
 where
     Q: Quantity,
-    A: Iterator<Item = Coordinate<Q>>,
+    A: IntoIterator<Item = Coordinate<Q>>,
 {
+    type IntoIter = A::IntoIter;
     type Item = Coordinate<Q>;
-    fn next(&mut self) -> Option<Self::Item> {
-        self.area.next()
+    fn into_iter(self) -> Self::IntoIter {
+        self.area.into_iter()
     }
 }
-
-impl<Q, A> DoubleEndedIterator for Area<A>
-where
-    Q: Quantity,
-    A: DoubleEndedIterator<Item = Coordinate<Q>>,
-{
-    fn next_back(&mut self) -> Option<Self::Item> {
-        self.area.next_back()
-    }
-}
-
-impl<Q, A> ExactSizeIterator for Area<A>
-where
-    Q: Quantity,
-    A: ExactSizeIterator<Item = Coordinate<Q>>,
-{
-    fn len(&self) -> usize {
-        self.area.len()
-    }
-}
-
-impl<Q: Quantity, A> FusedIterator for Area<A> where A: FusedIterator<Item = Coordinate<Q>> {}
 
 impl<C, Q> Sweep<Q> for C
 where
@@ -219,13 +181,14 @@ where
     C: Bias<Q> + Clone,
     <C as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
-    type Output = Chain<C::IntoIter, Rev<C::IntoIter>>;
+    type Output = Compound<C::IntoIter, Rev<C::IntoIter>>;
     fn sweep(self, range: (Q, Q)) -> Area<Self::Output> {
-        Area::new(
-            self.clone()
-                .bias(range.0)
-                .into_iter()
-                .chain(self.bias(range.1).into_iter().rev()),
-        )
+        let mut t1 = self.clone();
+        let mut t2 = self;
+        t1.bias(range.0);
+        t2.bias(range.1);
+        Area {
+            area: Compound::from((t1.into_iter(), t2.into_iter().rev())),
+        }
     }
 }

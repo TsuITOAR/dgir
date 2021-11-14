@@ -359,6 +359,12 @@ impl<S> Angle<S> {
     }
 }
 
+impl<S: Num + Display> Display for Angle<S> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}rad", self.0)
+    }
+}
+
 impl<S: Add<Output = S>> Add<Angle<S>> for Angle<S> {
     type Output = Angle<S>;
     fn add(self, rhs: Angle<S>) -> Self::Output {
@@ -384,6 +390,13 @@ impl<S: Div<Output = S>> Div<S> for Angle<S> {
     type Output = Angle<S>;
     fn div(self, rhs: S) -> Self::Output {
         Angle::<S>(self.0 / rhs)
+    }
+}
+
+impl<S: Div<Output = S>> Div<Angle<S>> for Angle<S> {
+    type Output = S;
+    fn div(self, rhs: Angle<S>) -> Self::Output {
+        self.0 / rhs.0
     }
 }
 

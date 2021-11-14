@@ -2,7 +2,7 @@ use std::time::Instant;
 
 use dgir::{
     color::LayerData,
-    draw::{curve::iter::IntoCurve, CircularArc, Resolution},
+    draw::{curve::IntoCurve, CircularArc, Resolution},
     gds::DgirLibrary,
     units::Angle,
     zero, MICROMETER,
@@ -11,7 +11,7 @@ use dgir::{
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let start = Instant::now();
     for _ in 1..100 {
-        let mut lib = DgirLibrary::new("test");
+        let mut lib = DgirLibrary::new("libname");
         let cir = CircularArc::new(
             100. * MICROMETER,
             (zero(), zero()),

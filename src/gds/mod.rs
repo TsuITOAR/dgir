@@ -11,7 +11,7 @@ use crate::{
 
 use self::togds::ToGds21Library;
 
-pub mod togds;
+mod togds;
 
 //const DISPLAY_POINTS_NUM: usize = 20;
 type Result<T> = gds21::GdsResult<T>;
@@ -88,22 +88,51 @@ where
     }
 }
 
-pub trait ToDgirElement<L, T>
+pub enum ElementsGroup<L, T>
 where
     L: LengthType,
     T: Num,
 {
-    fn to_dgir_element(self) -> Element<L, T>;
+    Single(Element<L, T>),
+    Group(Vec<Element<L, T>>),
 }
 
-impl<F, L, T> ToDgirElement<L, T> for F
+impl<L, T> From<Element<L, T>> for ElementsGroup<L, T>
+where
+    L: LengthType,
+    T: Num,
+{
+    fn from(e: Element<L, T>) -> Self {
+        ElementsGroup::Single(e)
+    }
+}
+
+impl<L, T> From<Vec<Element<L, T>>> for ElementsGroup<L, T>
+where
+    L: LengthType,
+    T: Num,
+{
+    fn from(e: Vec<Element<L, T>>) -> Self {
+        ElementsGroup::Group(e)
+    }
+}
+
+pub trait ToDgirElements<L, T>
+where
+    L: LengthType,
+    T: Num,
+{
+    fn to_dgir_elements(self) -> ElementsGroup<L, T>;
+}
+
+impl<F, L, T> ToDgirElements<L, T> for F
 where
     L: LengthType,
     T: Num,
     F: Into<Element<L, T>>,
 {
-    fn to_dgir_element(self) -> Element<L, T> {
-        self.into()
+    fn to_dgir_elements(self) -> ElementsGroup<L, T> {
+        ElementsGroup::Single(self.into())
     }
 }
 
@@ -162,8 +191,11 @@ where
         self.name = name;
         self
     }
-    pub fn push<U: Into<Element<L, T>>>(&mut self, element: U) -> &mut Self {
-        self.elements.push(element.into());
+    pub fn push<U: ToDgirElements<L, T>>(&mut self, element: U) -> &mut Self {
+        match element.to_dgir_elements() {
+            ElementsGroup::Single(s) => self.elements.push(s),
+            ElementsGroup::Group(g) => self.elements.extend(g),
+        }
         self
     }
 
