@@ -99,21 +99,37 @@ where
     }
 }
 
-pub trait GraphIterator<Q: Quantity> {
-    type GraphIter: Iterator<Item = Self::PointIter>;
-    type PointIter: Iterator<Item = Coordinate<Q>>;
+pub trait GraphIterator<'a, Q: Quantity> {
+    type GraphIter: Iterator<Item = Self::PointIter> + 'a;
+    type PointIter: Iterator<Item = Coordinate<Q>> + 'a;
     fn unzip(self) -> Self::GraphIter;
 }
 
-impl<T1, T2, Q> GraphIterator<Q> for Compound<T1, T2>
+impl<'a, T1, T2, Q> GraphIterator<'a, Q> for Compound<T1, T2>
 where
     Q: Quantity,
-    T1: Iterator<Item = Coordinate<Q>>,
-    T2: Iterator<Item = Coordinate<Q>>,
+    T1: Iterator<Item = Coordinate<Q>> + 'a,
+    T2: Iterator<Item = Coordinate<Q>> + 'a,
 {
-    type GraphIter = Box<dyn Iterator<Item = Self::PointIter>>;
-    type PointIter = Box<dyn Iterator<Item = Coordinate<Q>>>;
+    type GraphIter = <Vec<Self::PointIter> as IntoIterator>::IntoIter;
+    type PointIter = Box<dyn Iterator<Item = Coordinate<Q>> + 'a>;
     fn unzip(self) -> Self::GraphIter {
-        [Box::new(self.0.into()), Box::new(self.1.into())]
+        vec![
+            Box::new(self.0) as Self::PointIter,
+            Box::new(self.1) as Self::PointIter,
+        ]
+        .into_iter()
+    }
+}
+
+impl<'a, T, Q> GraphIterator<'a, Q> for Group<T>
+where
+    Q: Quantity,
+    T: Iterator<Item = Coordinate<Q>> + 'a,
+{
+    type GraphIter = <Vec<Self::PointIter> as IntoIterator>::IntoIter;
+    type PointIter = T;
+    fn unzip(self) -> Self::GraphIter {
+        self.0.into_iter()
     }
 }
