@@ -73,7 +73,7 @@ pub(crate) trait ToGds21Struct {
     fn to_gds21_struct(self, scale: Self::Scale) -> gds21::GdsStruct;
 }
 
-impl<T> ToGds21Struct for DgirCell<Absolute, T>
+impl<T> ToGds21Struct for DgirCell<Length<Absolute, T>>
 where
     T: Num,
 {
@@ -123,7 +123,7 @@ where
     }
 }
 
-impl<T> ToGds21Struct for DgirCell<Relative, T>
+impl<T> ToGds21Struct for DgirCell<Length<Relative, T>>
 where
     T: Num,
 {
@@ -177,7 +177,7 @@ pub(crate) trait ToGds21Library {
     fn to_gds21_library(self) -> gds21::GdsLibrary;
 }
 
-impl<T> ToGds21Library for super::DgirLibrary<Absolute, T>
+impl<T> ToGds21Library for super::DgirLibrary<T, Length<Absolute, T>>
 where
     T: Num + FromPrimitive,
 {
@@ -226,7 +226,7 @@ where
     }
 }
 
-impl<T> ToGds21Library for super::DgirLibrary<Relative, T>
+impl<T> ToGds21Library for super::DgirLibrary<T, Length<Relative, T>>
 where
     T: Num + FromPrimitive,
 {

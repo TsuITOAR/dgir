@@ -1,5 +1,7 @@
 use std::fmt::Display;
 
+use crate::{gds::ElementsGroup, units::LengthType, Quantity};
+
 #[derive(Clone, Copy, Debug, Default)]
 pub struct LayerData {
     pub(crate) layer: i16,
@@ -16,4 +18,10 @@ impl LayerData {
     pub fn new(layer: i16, datatype: i16) -> Self {
         Self { layer, datatype }
     }
+}
+
+pub trait Decoration {
+    type Quantity: Quantity;
+    type Color;
+    fn color(self, c: Self::Color) -> ElementsGroup<Self::Quantity>;
 }

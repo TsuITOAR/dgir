@@ -1,12 +1,17 @@
-use std::{collections::BTreeSet, fmt::Debug, rc::Rc};
+use std::{
+    collections::BTreeSet,
+    fmt::{Debug, Display},
+    rc::Rc,
+};
 
 use num::{FromPrimitive, ToPrimitive, Zero};
+use rayon::iter::Copied;
 
 use crate::{
     color::LayerData,
-    draw::coordinate::{Coordinate, LenCo},
+    draw::coordinate::Coordinate,
     units::{Absolute, Length, LengthType, Relative},
-    Num,
+    Num, Quantity,
 };
 
 use self::togds::ToGds21Library;
@@ -15,18 +20,17 @@ mod togds;
 
 //const DISPLAY_POINTS_NUM: usize = 20;
 type Result<T> = gds21::GdsResult<T>;
-type Points<L, T> = Box<dyn Iterator<Item = LenCo<L, T>>>;
+type Points<Q> = Box<dyn Iterator<Item = Coordinate<Q>>>;
 
-pub struct Path<L: LengthType, T: Num> {
-    pub curve: Points<L, T>,
+pub struct Path<Q: Quantity> {
+    pub curve: Points<Q>,
     pub color: LayerData,
-    pub width: Option<Length<L, T>>,
+    pub width: Option<Q>,
 }
 
-impl<L, T> Debug for Path<L, T>
+impl<Q> Debug for Path<Q>
 where
-    L: LengthType,
-    T: Num,
+    Q: Quantity,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -37,15 +41,14 @@ where
     }
 }
 
-pub struct Polygon<L: LengthType, T: Num> {
-    pub area: Points<L, T>,
+pub struct Polygon<Q: Quantity> {
+    pub area: Points<Q>,
     pub color: LayerData,
 }
 
-impl<L, T> Debug for Polygon<L, T>
+impl<Q> Debug for Polygon<Q>
 where
-    L: LengthType,
-    T: Num,
+    Q: Quantity,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Path {{ curve: ..., (layer, datatype): {}}}", self.color)
@@ -53,34 +56,31 @@ where
 }
 
 #[derive(Debug)]
-pub struct Ref<L, T>
+pub struct Ref<Q>
 where
-    L: LengthType,
-    T: Num,
+    Q: Quantity,
 {
     pub(crate) strans: Option<gds21::GdsStrans>,
-    pub(crate) pos: Coordinate<Length<L, T>>,
+    pub(crate) pos: Coordinate<Q>,
     pub(crate) id: String,
-    pub(crate) dep: BTreeSet<Rc<DgirCell<L, T>>>, //TODO need to avoid circular ref, or dead loop happens
+    pub(crate) dep: BTreeSet<Rc<DgirCell<Q>>>, //TODO need to avoid circular ref, or dead loop happens
 }
 
 #[derive(Debug)]
-pub enum Element<L, T>
+pub enum Element<Q>
 where
-    L: LengthType,
-    T: Num,
+    Q: Quantity,
 {
-    Path(Path<L, T>),
-    Polygon(Polygon<L, T>),
-    Ref(Ref<L, T>),
+    Path(Path<Q>),
+    Polygon(Polygon<Q>),
+    Ref(Ref<Q>),
 }
 
-impl<L, T> Element<L, T>
+impl<Q> Element<Q>
 where
-    L: LengthType,
-    T: Num,
+    Q: Quantity,
 {
-    pub fn to_cell<S: ToString>(self, name: S) -> DgirCell<L, T> {
+    pub fn to_cell<S: ToString>(self, name: S) -> DgirCell<Q> {
         DgirCell {
             name: name.to_string(),
             elements: vec![self],
@@ -88,98 +88,88 @@ where
     }
 }
 
-pub enum ElementsGroup<L, T>
+pub enum ElementsGroup<Q>
 where
-    L: LengthType,
-    T: Num,
+    Q: Quantity,
 {
-    Single(Element<L, T>),
-    Group(Vec<Element<L, T>>),
+    Single(Element<Q>),
+    Group(Vec<Element<Q>>),
 }
 
-impl<L, T> From<Element<L, T>> for ElementsGroup<L, T>
+impl<Q> From<Element<Q>> for ElementsGroup<Q>
 where
-    L: LengthType,
-    T: Num,
+    Q: Quantity,
 {
-    fn from(e: Element<L, T>) -> Self {
+    fn from(e: Element<Q>) -> Self {
         ElementsGroup::Single(e)
     }
 }
 
-impl<L, T> From<Vec<Element<L, T>>> for ElementsGroup<L, T>
+impl<Q> From<Vec<Element<Q>>> for ElementsGroup<Q>
 where
-    L: LengthType,
-    T: Num,
+    Q: Quantity,
 {
-    fn from(e: Vec<Element<L, T>>) -> Self {
+    fn from(e: Vec<Element<Q>>) -> Self {
         ElementsGroup::Group(e)
     }
 }
 
-pub trait ToDgirElements<L, T>
+pub trait ToDgirElements<Q>
 where
-    L: LengthType,
-    T: Num,
+    Q: Quantity,
 {
-    fn to_dgir_elements(self) -> ElementsGroup<L, T>;
+    fn to_dgir_elements(self) -> ElementsGroup<Q>;
 }
 
-impl<F, L, T> ToDgirElements<L, T> for F
+impl<F, Q> ToDgirElements<Q> for F
 where
-    L: LengthType,
-    T: Num,
-    F: Into<Element<L, T>>,
+    Q: Quantity,
+    F: Into<Element<Q>>,
 {
-    fn to_dgir_elements(self) -> ElementsGroup<L, T> {
+    fn to_dgir_elements(self) -> ElementsGroup<Q> {
         ElementsGroup::Single(self.into())
     }
 }
 
-impl<L, T> From<Path<L, T>> for Element<L, T>
+impl<Q> From<Path<Q>> for Element<Q>
 where
-    L: LengthType,
-    T: Num,
+    Q: Quantity,
 {
-    fn from(p: Path<L, T>) -> Self {
+    fn from(p: Path<Q>) -> Self {
         Element::Path(p)
     }
 }
 
-impl<L, T> From<Polygon<L, T>> for Element<L, T>
+impl<Q> From<Polygon<Q>> for Element<Q>
 where
-    L: LengthType,
-    T: Num,
+    Q: Quantity,
 {
-    fn from(p: Polygon<L, T>) -> Self {
+    fn from(p: Polygon<Q>) -> Self {
         Element::Polygon(p)
     }
 }
 
-impl<L, T> From<Ref<L, T>> for Element<L, T>
+impl<Q> From<Ref<Q>> for Element<Q>
 where
-    L: LengthType,
-    T: Num,
+    Q: Quantity,
 {
-    fn from(r: Ref<L, T>) -> Self {
+    fn from(r: Ref<Q>) -> Self {
         Element::Ref(r)
     }
 }
 
 #[derive(Debug)]
-pub struct DgirCell<L, T>
+pub struct DgirCell<Q>
 where
-    L: LengthType,
-    T: Num,
+    Q: Quantity,
 {
     pub name: String,
-    pub(crate) elements: Vec<Element<L, T>>,
+    pub(crate) elements: Vec<Element<Q>>,
 }
 
-impl<L, T> DgirCell<L, T>
+impl<Q> DgirCell<Q>
 where
-    L: LengthType,
-    T: Num,
+    Q: Quantity,
 {
     pub fn new(name: impl Into<String>) -> Self {
         Self {
@@ -191,7 +181,7 @@ where
         self.name = name;
         self
     }
-    pub fn push<U: ToDgirElements<L, T>>(&mut self, element: U) -> &mut Self {
+    pub fn push<U: ToDgirElements<Q>>(&mut self, element: U) -> &mut Self {
         match element.to_dgir_elements() {
             ElementsGroup::Single(s) => self.elements.push(s),
             ElementsGroup::Group(g) => self.elements.extend(g),
@@ -199,17 +189,17 @@ where
         self
     }
 
-    pub fn as_ref(self) -> Ref<L, T> {
+    pub fn as_ref(self) -> Ref<Q> {
         let mut s = self;
         Ref {
             strans: None,
             dep: s.get_dependencies(),
-            pos: Coordinate::from([Length::zero(), Length::zero()]),
+            pos: Coordinate::from([Q::zero(), Q::zero()]),
             id: s.name,
         }
     }
     //make sure every sub dependencies is empty
-    pub(crate) fn get_dependencies(&mut self) -> BTreeSet<Rc<DgirCell<L, T>>> {
+    pub(crate) fn get_dependencies(&mut self) -> BTreeSet<Rc<DgirCell<Q>>> {
         let mut dependencies = BTreeSet::new();
         for element in self.elements.iter_mut() {
             match element {
@@ -224,7 +214,7 @@ where
     }
 }
 
-fn is_sub_dependencies_empty<L: LengthType, T: Num>(set: &BTreeSet<Rc<DgirCell<L, T>>>) -> bool {
+fn is_sub_dependencies_empty<Q: Quantity>(set: &BTreeSet<Rc<DgirCell<Q>>>) -> bool {
     set.iter().all(|c| {
         c.elements.iter().all(|e| match e {
             Element::Ref(Ref {
@@ -235,57 +225,47 @@ fn is_sub_dependencies_empty<L: LengthType, T: Num>(set: &BTreeSet<Rc<DgirCell<L
     })
 }
 
-impl<L, T> PartialEq for DgirCell<L, T>
+impl<Q> PartialEq for DgirCell<Q>
 where
-    L: LengthType,
-    T: Num,
+    Q: Quantity,
 {
     fn eq(&self, other: &Self) -> bool {
         self.name.eq(&other.name)
     }
 }
-impl<L, T> Eq for DgirCell<L, T>
-where
-    L: LengthType,
-    T: Num,
-{
-}
+impl<Q> Eq for DgirCell<Q> where Q: Quantity {}
 
-impl<L, T> PartialOrd for DgirCell<L, T>
+impl<Q> PartialOrd for DgirCell<Q>
 where
-    L: LengthType,
-    T: Num,
+    Q: Quantity,
 {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         self.name.partial_cmp(&other.name)
     }
 }
-impl<L, T> Ord for DgirCell<L, T>
+impl<Q> Ord for DgirCell<Q>
 where
-    L: LengthType,
-    T: Num,
+    Q: Quantity,
 {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.name.cmp(&other.name)
     }
 }
 
-impl<L, T> AsRef<Vec<Element<L, T>>> for DgirCell<L, T>
+impl<Q> AsRef<Vec<Element<Q>>> for DgirCell<Q>
 where
-    L: LengthType,
-    T: Num,
+    Q: Quantity,
 {
-    fn as_ref(&self) -> &Vec<Element<L, T>> {
+    fn as_ref(&self) -> &Vec<Element<Q>> {
         &self.elements
     }
 }
 
-impl<L, T> AsMut<Vec<Element<L, T>>> for DgirCell<L, T>
+impl<Q> AsMut<Vec<Element<Q>>> for DgirCell<Q>
 where
-    L: LengthType,
-    T: Num,
+    Q: Quantity,
 {
-    fn as_mut(&mut self) -> &mut Vec<Element<L, T>> {
+    fn as_mut(&mut self) -> &mut Vec<Element<Q>> {
         &mut self.elements
     }
 }
@@ -312,17 +292,17 @@ where
 }
 
 #[derive(Debug)]
-pub struct DgirLibrary<L = Absolute, T = f64>
+pub struct DgirLibrary<T, Q>
 where
-    L: LengthType,
     T: Num + FromPrimitive,
+    Q: Quantity,
 {
     pub name: Option<String>,
     pub(crate) units: DgirUnits<T>,
-    pub(crate) cells: Vec<DgirCell<L, T>>,
+    pub(crate) cells: Vec<DgirCell<Q>>,
 }
 
-impl<L, T> Default for DgirLibrary<L, T>
+impl<L, T> Default for DgirLibrary<T, Length<L, T>>
 where
     L: LengthType,
     T: Num + FromPrimitive,
@@ -336,7 +316,7 @@ where
     }
 }
 
-impl<L, T> DgirLibrary<L, T>
+impl<L, T> DgirLibrary<T, Length<L, T>>
 where
     L: LengthType,
     T: Num + FromPrimitive,
@@ -355,13 +335,13 @@ where
         self.units.user = user_len;
         self
     }
-    pub fn push<C: Into<DgirCell<L, T>>>(&mut self, cell: C) -> &mut Self {
+    pub fn push<C: Into<DgirCell<Length<L, T>>>>(&mut self, cell: C) -> &mut Self {
         self.cells.push(cell.into());
         self
     }
 }
 
-impl<T> DgirLibrary<Absolute, T>
+impl<T> DgirLibrary<T, Length<Absolute, T>>
 where
     T: Num + FromPrimitive + ToPrimitive,
 {
@@ -370,7 +350,7 @@ where
     }
 }
 
-impl<T> DgirLibrary<Relative, T>
+impl<T> DgirLibrary<T, Length<Relative, T>>
 where
     T: Num + FromPrimitive + ToPrimitive,
 {

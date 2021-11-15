@@ -31,13 +31,12 @@ impl<T: Num, C: Iterator<Item = Coordinate<T>>> Curve<C> {
     }
 }
 
-impl<L, T, C> Curve<C>
+impl<Q, C> Curve<C>
 where
-    L: LengthType,
-    T: Num,
-    C: Iterator<Item = Coordinate<Length<L, T>>> + 'static,
+    Q: Quantity,
+    C: Iterator<Item = Coordinate<Q>> + 'static,
 {
-    pub fn to_path(self, color: LayerData) -> Element<L, T> {
+    pub fn to_path(self, color: LayerData) -> Element<Q> {
         Path {
             curve: Box::new(self.curve),
             color,
@@ -45,7 +44,7 @@ where
         }
         .into()
     }
-    pub fn width_path(self, width: Length<L, T>, color: LayerData) -> Element<L, T> {
+    pub fn width_path(self, width: Q, color: LayerData) -> Element<Q> {
         Path {
             curve: Box::new(self.curve),
             color,
@@ -148,13 +147,12 @@ where
     }
 }
 
-impl<L, T, A> Area<A>
+impl<Q, A> Area<A>
 where
-    L: LengthType,
-    T: Num,
-    A: Iterator<Item = Coordinate<Length<L, T>>> + 'static,
+    Q: Quantity,
+    A: Iterator<Item = Coordinate<Q>> + 'static,
 {
-    pub fn to_polygon(self, color: LayerData) -> Element<L, T> {
+    pub fn to_polygon(self, color: LayerData) -> Element<Q> {
         Polygon {
             area: Box::new(self.area),
             color,
