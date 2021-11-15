@@ -6,24 +6,23 @@ use crate::{
     color::LayerData,
     draw::coordinate::Coordinate,
     gds::{Element, Path, Polygon},
-    units::{Length, LengthType},
     Quantity,
 };
 
 use super::groups::Compound;
 use super::{Area, Bias, Curve, IntoArea, IntoCurve, Sweep};
 
-impl<T: Num, C: Iterator<Item = Coordinate<T>>> Curve<C> {
+impl<T: Num, C: IntoIterator<Item = Coordinate<T>>> Curve<C> {
     pub fn new(curve: C) -> Self {
         Self { curve }
     }
-    pub fn close(self) -> Area<Close<T, Fuse<C>>>
+    pub fn close(self) -> Area<Close<T, Fuse<C::IntoIter>>>
     where
         T: Copy + PartialEq,
-        C: Iterator<Item = Coordinate<T>>,
+        C: IntoIterator<Item = Coordinate<T>>,
     {
         Close {
-            curve: self.curve.fuse(),
+            curve: self.curve.into_iter().fuse(),
             first: None,
             current: None,
         }
@@ -34,11 +33,11 @@ impl<T: Num, C: Iterator<Item = Coordinate<T>>> Curve<C> {
 impl<Q, C> Curve<C>
 where
     Q: Quantity,
-    C: Iterator<Item = Coordinate<Q>> + 'static,
+    C: IntoIterator<Item = Coordinate<Q>> + 'static,
 {
     pub fn to_path(self, color: LayerData) -> Element<Q> {
         Path {
-            curve: Box::new(self.curve),
+            curve: Box::new(self.curve.into_iter()),
             color,
             width: None,
         }
@@ -46,7 +45,7 @@ where
     }
     pub fn width_path(self, width: Q, color: LayerData) -> Element<Q> {
         Path {
-            curve: Box::new(self.curve),
+            curve: Box::new(self.curve.into_iter()),
             color,
             width: Some(width),
         }
@@ -150,11 +149,11 @@ where
 impl<Q, A> Area<A>
 where
     Q: Quantity,
-    A: Iterator<Item = Coordinate<Q>> + 'static,
+    A: IntoIterator<Item = Coordinate<Q>> + 'static,
 {
     pub fn to_polygon(self, color: LayerData) -> Element<Q> {
         Polygon {
-            area: Box::new(self.area),
+            area: Box::new(self.area.into_iter()),
             color,
         }
         .into()
@@ -176,7 +175,7 @@ where
 impl<C, Q> Sweep<Q> for C
 where
     Q: Quantity,
-    C: Bias<Q> + Clone,
+    C: Bias<Q> + Clone + IntoIterator<Item = Coordinate<Q>>,
     <C as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
     type Output = Compound<C::IntoIter, Rev<C::IntoIter>>;

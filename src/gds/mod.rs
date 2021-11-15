@@ -1,11 +1,6 @@
-use std::{
-    collections::BTreeSet,
-    fmt::{Debug, Display},
-    rc::Rc,
-};
+use std::{collections::BTreeSet, fmt::Debug, rc::Rc};
 
-use num::{FromPrimitive, ToPrimitive, Zero};
-use rayon::iter::Copied;
+use num::{FromPrimitive, ToPrimitive};
 
 use crate::{
     color::LayerData,
@@ -94,6 +89,38 @@ where
 {
     Single(Element<Q>),
     Group(Vec<Element<Q>>),
+}
+
+impl<Q: Quantity> Default for ElementsGroup<Q> {
+    fn default() -> Self {
+        Self::Group(Vec::new())
+    }
+}
+
+impl<Q: Quantity> ElementsGroup<Q> {
+    fn as_vec(&mut self) -> &mut Vec<Element<Q>> {
+        let s = std::mem::take(self);
+        let g = match s {
+            Self::Group(g) => g,
+            Self::Single(s) => vec![s],
+        };
+        *self = g.into();
+        if let Self::Group(g) = self {
+            g
+        } else {
+            unreachable!()
+        }
+    }
+    fn into_vec(self) -> Vec<Element<Q>> {
+        match self {
+            Self::Single(s) => vec![s],
+            Self::Group(g) => g,
+        }
+    }
+    pub(crate) fn extend(&mut self, other: Self) -> &mut Self {
+        self.as_vec().extend(other.into_vec());
+        self
+    }
 }
 
 impl<Q> From<Element<Q>> for ElementsGroup<Q>

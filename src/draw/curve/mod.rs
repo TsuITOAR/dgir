@@ -7,8 +7,8 @@ use super::coordinate::Coordinate;
 #[cfg(feature = "rayon")]
 pub mod par_iter;
 
-pub mod iter;
 pub mod groups;
+pub mod iter;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Curve<C> {
@@ -49,12 +49,16 @@ pub trait Sweep<Q: Quantity> {
     fn sweep(self, range: (Q, Q)) -> Area<Self::Output>;
 }
 
-pub trait Bias<Q: Quantity>: IntoIterator<Item = Coordinate<Q>> {
-    fn bias(&mut self, b: Q) -> &mut Self;
+pub trait Bias<Q> {
+    fn bias(&mut self, b: Q);
 }
 
 pub trait Split<P>: Sized {
     fn split(self, pos: P) -> (Self, Self);
+}
+
+pub trait SplitHalf<P>: Split<P> {
+    fn split_half(self) -> (Self, Self);
 }
 
 impl<C, Q> Bias<Q> for Curve<C>
@@ -62,9 +66,8 @@ where
     C: Bias<Q> + IntoIterator<Item = Coordinate<Q>>,
     Q: Quantity,
 {
-    fn bias(&mut self, b: Q) -> &mut Self {
+    fn bias(&mut self, b: Q) {
         self.curve.bias(b);
-        self
     }
 }
 
@@ -74,10 +77,9 @@ where
     T1: Bias<Q>,
     T2: Bias<Q>,
 {
-    fn bias(&mut self, b: Q) -> &mut Self {
+    fn bias(&mut self, b: Q) {
         self.0.bias(b.clone());
         self.1.bias(b);
-        self
     }
 }
 
@@ -86,11 +88,10 @@ where
     Q: Quantity,
     T: Bias<Q>,
 {
-    fn bias(&mut self, b: Q) -> &mut Self {
+    fn bias(&mut self, b: Q) {
         for t in self.0.iter_mut() {
             t.bias(b.clone());
         }
-        self
     }
 }
 
@@ -103,7 +104,7 @@ where
     fn split(self, pos: P) -> (Self, Self) {
         let t1 = self.0.split(pos.clone());
         let t2 = self.1.split(pos);
-        (Self(t1.0, t2.0), Self(t1.1, t2.1))
+        (Self(t1.0, t2.1), Self(t1.1, t2.0))
     }
 }
 
@@ -121,3 +122,16 @@ where
         (Group(left), Group(right))
     }
 }
+
+macro_rules! wrapper_impl {
+    ($Wrapper:ty;$Field:ident;$Trait:ident;traitgen $($TraitGen:ident:$($Bound:ident)+*),*;$Fun:ident;funarg $($Arg:ident:$ArgType:ident),*;$Ret:ty;$($AssoType:ident),*) => {
+        impl<T,$($TraitGen:$($Bound)+*),*> $Trait<$($TraitGen),*> for $Wrapper<T> where T::$Trait<$($TraitGen),*>{
+            $(type $AssoType=T::$AssoType;)*
+            fn $Fun(self $(,$Arg:$ArgType)*)->ty{
+                $Trait::$Fun(self.$Field $(,$Arg)*)
+            }
+        }
+    };
+}
+
+wrapper_impl!(Curve;curve;Split;traitgen P:Clone;split;funarg pos:P;(Self,Self););

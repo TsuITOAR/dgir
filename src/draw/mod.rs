@@ -119,9 +119,8 @@ where
     L: LengthType,
     T: Float + FloatConst + Num + FromPrimitive + AddAssign,
 {
-    fn bias(&mut self, b: Length<L, T>) -> &mut Self {
+    fn bias(&mut self, b: Length<L, T>) {
         self.inner.radius += b;
-        self
     }
 }
 

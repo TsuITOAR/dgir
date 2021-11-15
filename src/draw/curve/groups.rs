@@ -3,8 +3,29 @@ use crate::{draw::coordinate::Coordinate, Quantity};
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Compound<T1, T2>(pub(crate) T1, pub(crate) T2);
 
+impl<Q, T1, T2> Compound<T1, T2>
+where
+    T1: IntoIterator<Item = Coordinate<Q>>,
+    T2: IntoIterator<Item = Coordinate<Q>>,
+    Q: Quantity,
+{
+    pub fn fusion(self) -> impl Iterator<Item = Coordinate<Q>> {
+        self.into_iter()
+    }
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Group<T>(pub(crate) Vec<T>);
+
+impl<Q, T> Group<T>
+where
+    T: IntoIterator<Item = Coordinate<Q>>,
+    Q: Quantity,
+{
+    pub fn fusion(self) -> impl Iterator<Item = Coordinate<Q>> {
+        self.into_iter()
+    }
+}
 
 pub trait IntoCompound<T1, T2> {
     fn into_compound(self) -> Compound<T1, T2>;
