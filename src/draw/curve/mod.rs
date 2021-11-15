@@ -124,14 +124,14 @@ where
 }
 
 macro_rules! wrapper_impl {
-    ($Wrapper:ty;$Field:ident;$Trait:ident;traitgen $($TraitGen:ident:$($Bound:ident)+*),*;$Fun:ident;funarg $($Arg:ident:$ArgType:ident),*;$Ret:ty;$($AssoType:ident),*) => {
-        impl<T,$($TraitGen:$($Bound)+*),*> $Trait<$($TraitGen),*> for $Wrapper<T> where T::$Trait<$($TraitGen),*>{
-            $(type $AssoType=T::$AssoType;)*
-            fn $Fun(self $(,$Arg:$ArgType)*)->ty{
-                $Trait::$Fun(self.$Field $(,$Arg)*)
+    ($wrapper:ty,$field:ident,$trait:ident,($($trait_gen:ident:$($bound:ident)*),*),$fun:ident($($arg:ident:$arg_type:ty),*)->$ret:ty$(,$asso_type:ident)*) => {
+        impl<T,$($trait_gen),*> $trait<$($trait_gen),*> for $wrapper where T:$trait<$($trait_gen)*>,$($trait_gen:$($bound)*),*{
+            $(type $asso_type=T::$asso_type;)*
+            fn $fun(self $(,$arg:$arg_type)*)->$ret{
+                <T as $trait>::$fun(self.$field $(,$arg)*)
             }
         }
     };
 }
 
-wrapper_impl!(Curve;curve;Split;traitgen P:Clone;split;funarg pos:P;(Self,Self););
+wrapper_impl!(Curve<T>,curve,Split,(P:Clone),split(pos:P)->(Self,Self));
