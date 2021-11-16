@@ -61,16 +61,6 @@ pub trait SplitHalf<P>: Split<P> {
     fn split_half(self) -> (Self, Self);
 }
 
-impl<C, Q> Bias<Q> for Curve<C>
-where
-    C: Bias<Q> + IntoIterator<Item = Coordinate<Q>>,
-    Q: Quantity,
-{
-    fn bias(&mut self, b: Q) {
-        self.curve.bias(b);
-    }
-}
-
 impl<Q, T1, T2> Bias<Q> for Compound<T1, T2>
 where
     Q: Quantity,
@@ -124,14 +114,92 @@ where
 }
 
 macro_rules! wrapper_impl {
-    ($wrapper:ty,$field:ident,$trait:ident,($($trait_gen:ident:$($bound:ident)*),*),$fun:ident($($arg:ident:$arg_type:ty),*)->$ret:ty$(,$asso_type:ident)*) => {
-        impl<T,$($trait_gen),*> $trait<$($trait_gen),*> for $wrapper where T:$trait<$($trait_gen)*>,$($trait_gen:$($bound)*),*{
-            $(type $asso_type=T::$asso_type;)*
-            fn $fun(self $(,$arg:$arg_type)*)->$ret{
-                <T as $trait>::$fun(self.$field $(,$arg)*)
+    (
+        $wrapper:ident<$wgen:ident$(:$($wbound:ident)*)?$(,)*>,
+        $field:ident,
+        $trait:ident$(<$($tgen:ident$(:$($tbound:ident)*)?),+$(,)*>)?,
+        $fun:ident(self$(,$arg:ident:$arg_type:ty)*$(,)*)$(->$ret:ty)?
+        $(,associate $asso_type:ident)*
+        $(,impl_fn $temp:ident $im:expr)?
+        $(,)*
+    ) => {
+            impl<$wgen:$trait$(<$($tgen),*>)? $(+$($wbound:ident)+*)? $(,$($tgen$(:$($tbound)*)?),+)?> $trait$(<$($tgen),*>)? for $wrapper<$wgen>
+            {
+                $(type $asso_type=T::$asso_type;)*
+                fn $fun(self$(,$arg:$arg_type)*)$(->$ret)?{
+                    wrapper_impl!(@get_impl self.$field.$fun($($arg),*)$(,$temp,$im)?)
+                }
             }
-        }
-    };
+        };
+        (
+        $wrapper:ident<$wgen:ident$(:$($wbound:ident)*)?$(,)*>,
+        $field:ident,
+        $trait:ident$(<$($tgen:ident$(:$($tbound:ident)*)?),+$(,)*>)?,
+        $fun:ident(&mut self$(,$arg:ident:$arg_type:ty)*$(,)*)$(->$ret:ty)?
+        $(,associate $asso_type:ident)*
+        $(,impl_fn $temp:ident $im:expr)?
+        $(,)*
+    ) => {
+            impl<$wgen:$trait$(<$($tgen),*>)? $(+$($wbound:ident)+*)? $(,$($tgen$(:$($tbound)*)?),+)?> $trait$(<$($tgen),*>)? for $wrapper<$wgen>
+            {
+                $(type $asso_type=T::$asso_type;)*
+                fn $fun(&mut self$(,$arg:$arg_type)*)$(->$ret)?{
+                    wrapper_impl!(@get_impl self.$field.$fun($($arg),*)$(,$temp,$im)?)
+                }
+            }
+        };
+        (
+        $wrapper:ident<$wgen:ident$(:$($wbound:ident)*)?$(,)*>,
+        $field:ident,
+        $trait:ident$(<$($tgen:ident$(:$($tbound:ident)*)?),+$(,)*>)?,
+        $fun:ident(&self$(,$arg:ident:$arg_type:ty)*$(,)*)$(->$ret:ty)?
+        $(,associate $asso_type:ident)*
+        $(,impl_fn $temp:ident $im:expr)?
+        $(,)*
+    ) => {
+            impl<$wgen:$trait$(<$($tgen),*>)? $(+$($wbound:ident)+*)? $(,$($tgen$(:$($tbound)*)?),+)?> $trait$(<$($tgen),*>)? for $wrapper<$wgen>
+            {
+                $(type $asso_type=T::$asso_type;)*
+                fn $fun(&self$(,$arg:$arg_type)*)$(->$ret)?{
+                    wrapper_impl!(@get_impl self.$field.$fun($($arg),*)$(,$temp,$im)?)
+                }
+            }
+        };
+        (
+        $wrapper:ident<$wgen:ident$(:$($wbound:ident)*)?$(,)*>,
+        $field:ident,
+        $trait:ident$(<$($tgen:ident$(:$($tbound:ident)*)?),+$(,)*>)?,
+        $fun:ident($($arg:ident:$arg_type:ty),*$(,)*)$(->$ret:ty)?
+        $(,associate $asso_type:ident)*
+        $(,impl_fn $temp:ident $im:expr)?
+        $(,)*
+    ) => {
+            impl<$wgen:$trait$(<$($tgen),*>)? $(+$($wbound:ident)+*)? $(,$($tgen$(:$($tbound)*)?),+)?> $trait$(<$($tgen),*>)? for $wrapper<$wgen>
+            {
+                $(type $asso_type=T::$asso_type;)*
+                fn $fun($($arg:$arg_type,)*)$(->$ret)?{
+                    wrapper_impl!(@get_impl self.$field::$fun($($arg),*)$(,$temp,$im)?)
+                }
+            }
+        };
+    (
+        @get_impl $origin:expr,$temp:ident,$im:expr$(,)*
+    ) =>{
+            {
+                let $temp=$origin;
+                $im
+            }
+        };
+    (
+        @get_impl $origin:expr$(,)*
+    ) =>{
+            $origin
+        };
 }
 
-wrapper_impl!(Curve<T>,curve,Split,(P:Clone),split(pos:P)->(Self,Self));
+wrapper_impl!(Curve<T>,curve,Split<P>,split(self,pos:P)->(Self,Self),impl_fn a (Curve{curve:a.0},Curve{curve:a.1}));
+wrapper_impl!(Area<T>,area,Split<P>,split(self,pos:P)->(Self,Self),impl_fn a (Area{area:a.0},Area{area:a.1}));
+wrapper_impl!(Curve<T>,curve,SplitHalf<P>,split_half(self)->(Self,Self),impl_fn a (Curve{curve:a.0},Curve{curve:a.1}));
+wrapper_impl!(Area<T>,area,SplitHalf<P>,split_half(self)->(Self,Self),impl_fn a (Area{area:a.0},Area{area:a.1}));
+wrapper_impl!(Curve<T>, curve, Bias<Q: Quantity>, bias(&mut self, b: Q));
+wrapper_impl!(Area<T>, area, Bias<Q: Quantity>, bias(&mut self, b: Q));

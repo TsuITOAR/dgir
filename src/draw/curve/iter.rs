@@ -1,7 +1,5 @@
 use std::iter::{Fuse, FusedIterator, Rev};
 
-use crate::Num;
-
 use crate::{
     color::LayerData,
     draw::coordinate::Coordinate,
@@ -12,14 +10,18 @@ use crate::{
 use super::groups::Compound;
 use super::{Area, Bias, Curve, IntoArea, IntoCurve, Sweep};
 
-impl<T: Num, C: IntoIterator<Item = Coordinate<T>>> Curve<C> {
+impl<Q, C> Curve<C>
+where
+    Q: Quantity,
+    C: IntoIterator<Item = Coordinate<Q>>,
+{
     pub fn new(curve: C) -> Self {
         Self { curve }
     }
-    pub fn close(self) -> Area<Close<T, Fuse<C::IntoIter>>>
+    pub fn close(self) -> Area<Close<Q, Fuse<C::IntoIter>>>
     where
-        T: Copy + PartialEq,
-        C: IntoIterator<Item = Coordinate<T>>,
+        Q: Copy + PartialEq,
+        C: IntoIterator<Item = Coordinate<Q>>,
     {
         Close {
             curve: self.curve.into_iter().fuse(),
@@ -28,14 +30,10 @@ impl<T: Num, C: IntoIterator<Item = Coordinate<T>>> Curve<C> {
         }
         .into_area()
     }
-}
-
-impl<Q, C> Curve<C>
-where
-    Q: Quantity,
-    C: IntoIterator<Item = Coordinate<Q>> + 'static,
-{
-    pub fn to_path(self, color: LayerData) -> Element<Q> {
+    pub fn to_path(self, color: LayerData) -> Element<Q>
+    where
+        C: 'static,
+    {
         Path {
             curve: Box::new(self.curve.into_iter()),
             color,
@@ -43,7 +41,10 @@ where
         }
         .into()
     }
-    pub fn width_path(self, width: Q, color: LayerData) -> Element<Q> {
+    pub fn width_path(self, width: Q, color: LayerData) -> Element<Q>
+    where
+        C: 'static,
+    {
         Path {
             curve: Box::new(self.curve.into_iter()),
             color,
