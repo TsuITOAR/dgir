@@ -18,6 +18,14 @@ where
     pub fn new(curve: C) -> Self {
         Self { curve }
     }
+
+    pub fn compound_with<B: IntoIterator<Item = Coordinate<Q>> + 'static>(
+        self,
+        other: B,
+    ) -> Compound<Self, B> {
+        Compound::from((self, other))
+    }
+
     pub fn close(self) -> Area<Close<Q, Fuse<C::IntoIter>>>
     where
         Q: Copy + PartialEq,
@@ -30,6 +38,7 @@ where
         }
         .into_area()
     }
+
     pub fn to_path(self, color: LayerData) -> Element<Q>
     where
         C: 'static,
@@ -41,6 +50,7 @@ where
         }
         .into()
     }
+
     pub fn width_path(self, width: Q, color: LayerData) -> Element<Q>
     where
         C: 'static,
@@ -162,6 +172,13 @@ where
             color,
         }
         .into()
+    }
+    
+    pub fn compound_with<B: IntoIterator<Item = Coordinate<Q>> + 'static>(
+        self,
+        other: B,
+    ) -> Compound<Self, B> {
+        Compound::from((self, other))
     }
 }
 

@@ -148,7 +148,7 @@ where
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
-pub struct MulAsScalar<M>(pub(crate) M);
+pub(crate) struct MulAsScalar<M>(pub(crate) M);
 
 impl<M> From<M> for MulAsScalar<M> {
     fn from(m: M) -> Self {

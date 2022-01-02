@@ -75,7 +75,7 @@ impl<Q> Element<Q>
 where
     Q: Quantity,
 {
-    pub fn to_cell<S: ToString>(self, name: S) -> DgirCell<Q> {
+    pub fn into_cell<S: ToString>(self, name: S) -> DgirCell<Q> {
         DgirCell {
             name: name.to_string(),
             elements: vec![self],
@@ -141,23 +141,6 @@ where
     }
 }
 
-pub trait ToDgirElements<Q>
-where
-    Q: Quantity,
-{
-    fn to_dgir_elements(self) -> ElementsGroup<Q>;
-}
-
-impl<F, Q> ToDgirElements<Q> for F
-where
-    Q: Quantity,
-    F: Into<Element<Q>>,
-{
-    fn to_dgir_elements(self) -> ElementsGroup<Q> {
-        ElementsGroup::Single(self.into())
-    }
-}
-
 impl<Q> From<Path<Q>> for Element<Q>
 where
     Q: Quantity,
@@ -208,8 +191,8 @@ where
         self.name = name;
         self
     }
-    pub fn push<U: ToDgirElements<Q>>(&mut self, element: U) -> &mut Self {
-        match element.to_dgir_elements() {
+    pub fn push<U: Into<ElementsGroup<Q>>>(&mut self, element: U) -> &mut Self {
+        match element.into() {
             ElementsGroup::Single(s) => self.elements.push(s),
             ElementsGroup::Group(g) => self.elements.extend(g),
         }

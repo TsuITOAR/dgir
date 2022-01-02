@@ -1,6 +1,6 @@
 #![feature(type_alias_impl_trait)]
 use gds21::GdsPoint;
-use log::warn;
+use log::{info, warn};
 use std::{
     fmt::{Debug, Display},
     marker::PhantomData,
@@ -98,5 +98,57 @@ fn close_curve(points: &mut Vec<GdsPoint>) -> bool {
         false
     } else {
         true
+    }
+}
+
+fn split_polygon<T: Clone>(mut raw: Vec<T>, max_points: usize) -> Vec<Vec<T>> {
+    let len = raw.len();
+    if raw.len() > max_points {
+        info!("auto splitting polygon");
+        let mut ret = Vec::new();
+        let mut temp = Vec::with_capacity(len / 2 + 1);
+        temp.push(raw[len / 4].clone());
+        temp.extend(raw.drain(len / 4 + 1..3 * len / 4));
+        temp.push(raw[len / 4 + 1].clone());
+        ret.extend(split_polygon(temp, max_points));
+        ret.extend(split_polygon(raw, max_points));
+        ret
+    } else {
+        vec![raw]
+    }
+}
+
+fn split_path<T: Clone>(mut raw: Vec<T>, max_points: usize) -> Vec<Vec<T>> {
+    let len = raw.len();
+    if raw.len() > max_points {
+        info!("auto splitting path");
+        let mut ret = Vec::new();
+        let mut temp = Vec::with_capacity(len / 2 + 1);
+        temp.extend(raw.drain(0..len / 2));
+        temp.push(raw[0].clone());
+        ret.extend(split_path(temp, max_points));
+        ret.extend(split_path(raw, max_points));
+        ret
+    } else {
+        vec![raw]
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::split_path;
+
+    use super::split_polygon;
+    #[test]
+    fn auto_split_polygon() {
+        let v = (0..10).collect::<Vec<_>>();
+        let r = split_polygon(v, 2);
+        assert_eq!(r.len(), 6);
+    }
+    #[test]
+    fn auto_split_path() {
+        let v = (0..10).collect::<Vec<_>>();
+        let r = split_path(v, 2);
+        assert_eq!(r.len(), 6);
     }
 }

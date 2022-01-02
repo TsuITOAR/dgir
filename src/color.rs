@@ -1,7 +1,13 @@
 use std::fmt::Display;
 
 use crate::{
-    draw::curve::groups::{Compound, Group},
+    draw::{
+        coordinate::Coordinate,
+        curve::{
+            groups::{Compound, Group},
+            Area, Curve,
+        },
+    },
     gds::ElementsGroup,
     Quantity,
 };
@@ -38,6 +44,86 @@ impl<T: Colour, const LEN: usize> Colour for [T; LEN] {}
 pub trait Decorated<C: Colour> {
     type Quantity: Quantity;
     fn color(self, c: C) -> ElementsGroup<Self::Quantity>;
+}
+
+impl<Q, A> Decorated<LayerData> for Area<A>
+where
+    Q: Quantity,
+    A: IntoIterator<Item = Coordinate<Q>> + 'static,
+{
+    type Quantity = Q;
+    fn color(self, c: LayerData) -> ElementsGroup<Self::Quantity> {
+        ElementsGroup::Single(self.to_polygon(c))
+    }
+}
+
+impl<Q, C> Decorated<LayerData> for Curve<C>
+where
+    Q: Quantity,
+    C: IntoIterator<Item = Coordinate<Q>> + 'static,
+{
+    type Quantity = Q;
+    fn color(self, c: LayerData) -> ElementsGroup<Self::Quantity> {
+        ElementsGroup::Single(self.to_path(c))
+    }
+}
+
+impl<Q, C> Decorated<LayerData> for (Curve<C>, Q)
+where
+    Q: Quantity,
+    C: IntoIterator<Item = Coordinate<Q>> + 'static,
+{
+    type Quantity = Q;
+    fn color(self, c: LayerData) -> ElementsGroup<Self::Quantity> {
+        ElementsGroup::Single(self.0.width_path(self.1, c))
+    }
+}
+
+impl<Q, T1, T2> Decorated<LayerData> for Compound<T1, T2>
+where
+    Q: Quantity,
+    T1: Decorated<LayerData, Quantity = Q>,
+    T2: Decorated<LayerData, Quantity = Q>,
+{
+    type Quantity = Q;
+    fn color(self, c: LayerData) -> ElementsGroup<Self::Quantity> {
+        let mut s = self.0.color(c);
+        s.extend(self.1.color(c));
+        s
+    }
+}
+
+impl<Q, T> Decorated<LayerData> for Group<T>
+where
+    Q: Quantity,
+    T: Decorated<LayerData, Quantity = Q>,
+{
+    type Quantity = Q;
+    fn color(self, c: LayerData) -> ElementsGroup<Self::Quantity> {
+        self.0
+            .into_iter()
+            .map(|x| x.color(c))
+            .fold(ElementsGroup::default(), |mut accum, new| {
+                accum.extend(new);
+                accum
+            })
+    }
+}
+
+impl<Q, T, const LEN: usize> Decorated<LayerData> for [T; LEN]
+where
+    Q: Quantity,
+    T: Decorated<LayerData, Quantity = Q>,
+{
+    type Quantity = Q;
+    fn color(self, c: LayerData) -> ElementsGroup<Self::Quantity> {
+        self.into_iter()
+            .map(|x| x.color(c))
+            .fold(ElementsGroup::default(), |mut accum, new| {
+                accum.extend(new);
+                accum
+            })
+    }
 }
 
 impl<Q, T1, T2, C1, C2> Decorated<Compound<C1, C2>> for Compound<T1, T2>

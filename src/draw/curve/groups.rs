@@ -14,6 +14,13 @@ where
     pub fn fusion(self) -> impl Iterator<Item = Coordinate<Q>> {
         self.into_iter()
     }
+
+    pub fn compound_with<B: IntoIterator<Item = Coordinate<Q>>>(
+        self,
+        other: B,
+    ) -> Compound<Self, B> {
+        Compound::from((self, other))
+    }
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
@@ -27,14 +34,16 @@ where
     pub fn fusion(self) -> impl Iterator<Item = Coordinate<Q>> {
         self.into_iter()
     }
+
+    pub fn compound_with<B: IntoIterator<Item = Coordinate<Q>>>(
+        self,
+        other: B,
+    ) -> Compound<Self, B> {
+        Compound::from((self, other))
+    }
 }
 
-impl<T1, T2, Q> From<(T1, T2)> for Compound<T1, T2>
-where
-    Q: Quantity,
-    T1: IntoIterator<Item = Coordinate<Q>>,
-    T2: IntoIterator<Item = Coordinate<Q>>,
-{
+impl<T1, T2> From<(T1, T2)> for Compound<T1, T2> {
     fn from(f: (T1, T2)) -> Self {
         Self(f.0, f.1)
     }
@@ -95,7 +104,7 @@ where
     }
 }
 
-pub trait GraphIterator<'a, Q: Quantity> {
+pub trait GraphIterator<'a, Q: Quantity>: Sized {
     type GraphIter: Iterator<Item = Self::PointIter> + 'a;
     type PointIter: Iterator<Item = Coordinate<Q>> + 'a;
     fn unzip(self) -> Self::GraphIter;

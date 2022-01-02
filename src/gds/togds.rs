@@ -6,9 +6,9 @@ use crate::{
     close_curve,
     draw::coordinate::LenCo,
     gds::Element,
-    points_num_check,
+    points_num_check, split_path, split_polygon,
     units::{Absolute, Length, Relative},
-    Num,
+    Num, MAX_POINTS_NUM,
 };
 
 use super::DgirCell;
@@ -81,34 +81,68 @@ where
     fn to_gds21_struct(self, scale: Self::Scale) -> gds21::GdsStruct {
         use gds21::*;
         let mut new_cell = GdsStruct::new(self.name);
-        for painting in self.elements {
-            new_cell.elems.push(match painting {
-                Element::Path(p) => GdsElement::GdsPath({
+        for elem in self.elements {
+            match elem {
+                Element::Path(p) => {
                     let xy = p.curve.to_gds21_points(scale);
-                    debug_assert!(points_num_check(&xy));
-                    GdsPath {
-                        layer: p.color.layer,
-                        datatype: p.color.datatype,
-                        xy,
-                        width: match p.width {
+                    if points_num_check(&xy) {
+                        new_cell.elems.push(GdsElement::GdsPath({
+                            GdsPath {
+                                layer: p.color.layer,
+                                datatype: p.color.datatype,
+                                xy,
+                                width: match p.width {
+                                    Some(l) => (l / scale).to_i32(),
+                                    None => None,
+                                },
+                                ..Default::default()
+                            }
+                        }))
+                    } else {
+                        let width = match p.width {
                             Some(l) => (l / scale).to_i32(),
                             None => None,
-                        },
-                        ..Default::default()
+                        };
+                        for c in split_path(xy, MAX_POINTS_NUM) {
+                            new_cell.elems.push(GdsElement::GdsPath({
+                                GdsPath {
+                                    layer: p.color.layer,
+                                    datatype: p.color.datatype,
+                                    xy: c,
+                                    width,
+                                    ..Default::default()
+                                }
+                            }))
+                        }
                     }
-                }),
-                Element::Polygon(p) => GdsElement::GdsBoundary({
+                }
+                Element::Polygon(p) => {
                     let mut xy = p.area.to_gds21_points(scale);
-                    debug_assert!(close_curve(&mut xy));
-                    debug_assert!(points_num_check(&xy));
-                    GdsBoundary {
-                        layer: p.color.layer,
-                        datatype: p.color.datatype,
-                        xy,
-                        ..Default::default()
+                    close_curve(&mut xy); //TODO: add a notify layer data if curve not closed
+
+                    if points_num_check(&xy) {
+                        new_cell.elems.push(GdsElement::GdsBoundary({
+                            GdsBoundary {
+                                layer: p.color.layer,
+                                datatype: p.color.datatype,
+                                xy,
+                                ..Default::default()
+                            }
+                        }))
+                    } else {
+                        for c in split_polygon(xy, MAX_POINTS_NUM) {
+                            new_cell.elems.push(GdsElement::GdsBoundary({
+                                GdsBoundary {
+                                    layer: p.color.layer,
+                                    datatype: p.color.datatype,
+                                    xy: c,
+                                    ..Default::default()
+                                }
+                            }))
+                        }
                     }
-                }),
-                Element::Ref(r) => GdsElement::GdsStructRef(GdsStructRef {
+                }
+                Element::Ref(r) => new_cell.elems.push(GdsElement::GdsStructRef(GdsStructRef {
                     name: r.id,
                     xy: Gds21Point::new(
                         (r.pos[0] / scale).to_i32().unwrap(),
@@ -116,8 +150,8 @@ where
                     ),
                     strans: r.strans,
                     ..Default::default()
-                }),
-            })
+                })),
+            }
         }
         new_cell
     }
@@ -131,34 +165,68 @@ where
     fn to_gds21_struct(self, scale: Self::Scale) -> gds21::GdsStruct {
         use gds21::*;
         let mut new_cell = GdsStruct::new(self.name);
-        for painting in self.elements {
-            new_cell.elems.push(match painting {
-                Element::Path(p) => GdsElement::GdsPath({
+        for elem in self.elements {
+            match elem {
+                Element::Path(p) => {
                     let xy = p.curve.to_gds21_points(scale);
-                    points_num_check(&xy);
-                    GdsPath {
-                        layer: p.color.layer,
-                        datatype: p.color.datatype,
-                        xy,
-                        width: match p.width {
+                    if points_num_check(&xy) {
+                        new_cell.elems.push(GdsElement::GdsPath({
+                            GdsPath {
+                                layer: p.color.layer,
+                                datatype: p.color.datatype,
+                                xy,
+                                width: match p.width {
+                                    Some(l) => l.value.to_i32(),
+                                    None => None,
+                                },
+                                ..Default::default()
+                            }
+                        }))
+                    } else {
+                        let width = match p.width {
                             Some(l) => l.value.to_i32(),
                             None => None,
-                        },
-                        ..Default::default()
+                        };
+                        for c in split_path(xy, MAX_POINTS_NUM) {
+                            new_cell.elems.push(GdsElement::GdsPath({
+                                GdsPath {
+                                    layer: p.color.layer,
+                                    datatype: p.color.datatype,
+                                    xy: c,
+                                    width,
+                                    ..Default::default()
+                                }
+                            }))
+                        }
                     }
-                }),
-                Element::Polygon(p) => GdsElement::GdsBoundary({
+                }
+                Element::Polygon(p) => {
                     let mut xy = p.area.to_gds21_points(scale);
-                    debug_assert!(close_curve(&mut xy));
-                    debug_assert!(points_num_check(&xy));
-                    GdsBoundary {
-                        layer: p.color.layer,
-                        datatype: p.color.datatype,
-                        xy,
-                        ..Default::default()
+                    close_curve(&mut xy); //TODO: add a notify layer data if curve not closed
+
+                    if points_num_check(&xy) {
+                        new_cell.elems.push(GdsElement::GdsBoundary({
+                            GdsBoundary {
+                                layer: p.color.layer,
+                                datatype: p.color.datatype,
+                                xy,
+                                ..Default::default()
+                            }
+                        }))
+                    } else {
+                        for c in split_polygon(xy, MAX_POINTS_NUM) {
+                            new_cell.elems.push(GdsElement::GdsBoundary({
+                                GdsBoundary {
+                                    layer: p.color.layer,
+                                    datatype: p.color.datatype,
+                                    xy: c,
+                                    ..Default::default()
+                                }
+                            }))
+                        }
                     }
-                }),
-                Element::Ref(r) => GdsElement::GdsStructRef(GdsStructRef {
+                }
+                Element::Ref(r) => new_cell.elems.push(GdsElement::GdsStructRef(GdsStructRef {
                     name: r.id,
                     xy: Gds21Point::new(
                         r.pos[0].value.to_i32().unwrap(),
@@ -166,8 +234,8 @@ where
                     ),
                     strans: r.strans,
                     ..Default::default()
-                }),
-            })
+                })),
+            }
         }
         new_cell
     }

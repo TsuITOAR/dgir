@@ -13,7 +13,7 @@ log = "*"
 rayon = { version = "*", optional = true }
 nalgebra = { version = "*", optional = true }
 float-cmp = "*"
-
+env_logger = "0.9.0"
 
 [features]
 default = ["rayon", "nalgebra"]
