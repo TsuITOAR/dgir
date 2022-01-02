@@ -104,6 +104,7 @@ where
     }
 }
 
+// ! this trait not used yet
 pub trait GraphIterator<'a, Q: Quantity>: Sized {
     type GraphIter: Iterator<Item = Self::PointIter> + 'a;
     type PointIter: Iterator<Item = Coordinate<Q>> + 'a;

@@ -10,9 +10,13 @@ use crate::{
 use super::{
     coordinate::Coordinate,
     coordinate::MulAsScalar,
-    curve::{Area, Curve},
+    curve::{
+        groups::{Compound, Group},
+        Area, Curve,
+    },
 };
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct MulOpClosure<M> {
     pub m: M,
 }
@@ -49,9 +53,9 @@ pub trait Transfer<Q>: Sized
 where
     Q: Quantity,
 {
-    type Output<F: FnMut(Coordinate<Q>) -> Coordinate<Q>>;
-    fn transfer<F: FnMut(Coordinate<Q>) -> Coordinate<Q>>(self, f: F) -> Self::Output<F>;
-    fn matrix_trans<M>(self, m: M) -> Self::Output<MulOpClosure<M>>
+    type Output<F: FnMut(Coordinate<Q>) -> Coordinate<Q> + Clone>;
+    fn transfer<F: FnMut(Coordinate<Q>) -> Coordinate<Q> + Clone>(self, f: F) -> Self::Output<F>;
+    fn matrix_trans<M: Clone>(self, m: M) -> Self::Output<MulOpClosure<M>>
     where
         for<'a> &'a M: Mul<Coordinate<Q>, Output = Coordinate<Q>> + Copy,
     {
@@ -101,8 +105,8 @@ where
 {
 }
 impl<Q: Quantity, C: IntoIterator<Item = Coordinate<Q>>> Transfer<Q> for Curve<C> {
-    type Output<F: FnMut(Coordinate<Q>) -> Coordinate<Q>> = Curve<Map<C::IntoIter, F>>;
-    fn transfer<F: FnMut(Coordinate<Q>) -> Coordinate<Q>>(self, f: F) -> Self::Output<F> {
+    type Output<F: FnMut(Coordinate<Q>) -> Coordinate<Q> + Clone> = Curve<Map<C::IntoIter, F>>;
+    fn transfer<F: FnMut(Coordinate<Q>) -> Coordinate<Q> + Clone>(self, f: F) -> Self::Output<F> {
         Curve {
             curve: self.curve.into_iter().map(f),
         }
@@ -110,11 +114,35 @@ impl<Q: Quantity, C: IntoIterator<Item = Coordinate<Q>>> Transfer<Q> for Curve<C
 }
 
 impl<Q: Quantity, A: IntoIterator<Item = Coordinate<Q>>> Transfer<Q> for Area<A> {
-    type Output<F: FnMut(Coordinate<Q>) -> Coordinate<Q>> = Area<Map<A::IntoIter, F>>;
-    fn transfer<F: FnMut(Coordinate<Q>) -> Coordinate<Q>>(self, f: F) -> Self::Output<F> {
+    type Output<F: FnMut(Coordinate<Q>) -> Coordinate<Q> + Clone> = Area<Map<A::IntoIter, F>>;
+    fn transfer<F: FnMut(Coordinate<Q>) -> Coordinate<Q> + Clone>(self, f: F) -> Self::Output<F> {
         Area {
             area: self.area.into_iter().map(f),
         }
+    }
+}
+
+impl<Q, T1, T2> Transfer<Q> for Compound<T1, T2>
+where
+    Q: Quantity,
+    T1: Transfer<Q>,
+    T2: Transfer<Q>,
+{
+    type Output<F: FnMut(Coordinate<Q>) -> Coordinate<Q> + Clone> =
+        Compound<T1::Output<F>, T2::Output<F>>;
+    fn transfer<F: FnMut(Coordinate<Q>) -> Coordinate<Q> + Clone>(self, f: F) -> Self::Output<F> {
+        Compound::from((self.0.transfer(f.clone()), self.1.transfer(f.clone())))
+    }
+}
+
+impl<Q, T> Transfer<Q> for Group<T>
+where
+    Q: Quantity,
+    T: Transfer<Q>,
+{
+    type Output<F: FnMut(Coordinate<Q>) -> Coordinate<Q> + Clone> = Group<T::Output<F>>;
+    fn transfer<F: FnMut(Coordinate<Q>) -> Coordinate<Q> + Clone>(self, f: F) -> Self::Output<F> {
+        Group(self.0.into_iter().map(|x| x.transfer(f.clone())).collect())
     }
 }
 
