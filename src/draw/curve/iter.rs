@@ -2,7 +2,7 @@ use std::iter::{Fuse, FusedIterator, Rev};
 
 use crate::{
     color::LayerData,
-    draw::coordinate::Coordinate,
+    draw::{coordinate::Coordinate},
     gds::{Element, Path, Polygon},
     Quantity,
 };
@@ -173,7 +173,7 @@ where
         }
         .into()
     }
-    
+
     pub fn compound_with<B: IntoIterator<Item = Coordinate<Q>> + 'static>(
         self,
         other: B,

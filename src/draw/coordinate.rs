@@ -148,7 +148,7 @@ where
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) struct MulAsScalar<M>(pub(crate) M);
+pub struct MulAsScalar<M>(pub(crate) M);
 
 impl<M> From<M> for MulAsScalar<M> {
     fn from(m: M) -> Self {
@@ -163,5 +163,15 @@ where
     type Output = LenCo<L, T>;
     fn mul(self, rhs: LenCo<L, T>) -> Self::Output {
         Coordinate::from_basic(Coordinate(self.0 * rhs.to_basic().0))
+    }
+}
+
+impl<'a, M, L: LengthType, T: Num> Mul<LenCo<L, T>> for &'a MulAsScalar<M>
+where
+    for<'b> &'b M: Mul<Point2<T>, Output = Point2<T>>,
+{
+    type Output = LenCo<L, T>;
+    fn mul(self, rhs: LenCo<L, T>) -> Self::Output {
+        Coordinate::from_basic(Coordinate(&self.0 * rhs.to_basic().0))
     }
 }

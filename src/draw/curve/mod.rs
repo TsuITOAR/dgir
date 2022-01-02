@@ -12,12 +12,12 @@ pub mod iter;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Curve<C> {
-    curve: C,
+    pub(crate) curve: C,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Area<A> {
-    area: A,
+    pub(crate) area: A,
 }
 
 pub trait IntoCurve {

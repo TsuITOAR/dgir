@@ -23,7 +23,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         100. * MICROMETER,
         (zero(), zero()),
         (Angle::from_deg(0.), Angle::from_deg(360.)),
-        Resolution::MinNumber(8009),
+        Resolution::MinNumber(10001),
     );
     let c: Compound<_, _> = (
         cir.sweep((-MICROMETER, MICROMETER)),

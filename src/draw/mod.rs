@@ -16,7 +16,7 @@ use self::{
 
 pub mod coordinate;
 pub mod curve;
-pub mod transfer;
+pub(crate) mod transfer;
 
 #[cfg(test)]
 const APROX_EQ_MARGIN: (f64, i64) = (0., 1);

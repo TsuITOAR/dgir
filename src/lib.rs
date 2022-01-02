@@ -1,4 +1,7 @@
 #![feature(type_alias_impl_trait)]
+#![feature(generic_associated_types)]
+#![feature(unboxed_closures)]
+#![feature(fn_traits)]
 use gds21::GdsPoint;
 use log::{info, warn};
 use std::{
@@ -101,15 +104,24 @@ fn close_curve(points: &mut Vec<GdsPoint>) -> bool {
     }
 }
 
-fn split_polygon<T: Clone>(mut raw: Vec<T>, max_points: usize) -> Vec<Vec<T>> {
-    let len = raw.len();
+fn split_polygon<T: Clone + PartialEq + Debug>(mut raw: Vec<T>, max_points: usize) -> Vec<Vec<T>> {
+    assert!(max_points > 3);
+    if raw.is_empty() {
+        return Vec::new();
+    }
+    let len = if raw.first() == raw.last() {
+        raw.len() - 1
+    } else {
+        raw.len()
+    };
     if raw.len() > max_points {
         info!("auto splitting polygon");
         let mut ret = Vec::new();
-        let mut temp = Vec::with_capacity(len / 2 + 1);
+        let mut temp = Vec::with_capacity(len / 2 + 2);
         temp.push(raw[len / 4].clone());
-        temp.extend(raw.drain(len / 4 + 1..3 * len / 4));
+        temp.extend(raw.drain(len / 4 + 1..len * 3 / 4));
         temp.push(raw[len / 4 + 1].clone());
+        temp.push(temp[0].clone());
         ret.extend(split_polygon(temp, max_points));
         ret.extend(split_polygon(raw, max_points));
         ret
@@ -118,7 +130,8 @@ fn split_polygon<T: Clone>(mut raw: Vec<T>, max_points: usize) -> Vec<Vec<T>> {
     }
 }
 
-fn split_path<T: Clone>(mut raw: Vec<T>, max_points: usize) -> Vec<Vec<T>> {
+fn split_path<T: Clone + Debug>(mut raw: Vec<T>, max_points: usize) -> Vec<Vec<T>> {
+    assert!(max_points > 2);
     let len = raw.len();
     if raw.len() > max_points {
         info!("auto splitting path");
@@ -136,19 +149,17 @@ fn split_path<T: Clone>(mut raw: Vec<T>, max_points: usize) -> Vec<Vec<T>> {
 
 #[cfg(test)]
 mod tests {
-    use crate::split_path;
-
-    use super::split_polygon;
+    use super::{split_path, split_polygon};
     #[test]
     fn auto_split_polygon() {
         let v = (0..10).collect::<Vec<_>>();
-        let r = split_polygon(v, 2);
-        assert_eq!(r.len(), 6);
+        let r = split_polygon(v, 4);
+        assert_eq!(r.len(), 7);
     }
     #[test]
     fn auto_split_path() {
         let v = (0..10).collect::<Vec<_>>();
-        let r = split_path(v, 2);
-        assert_eq!(r.len(), 6);
+        let r = split_path(v, 3);
+        assert_eq!(r.len(), 5);
     }
 }

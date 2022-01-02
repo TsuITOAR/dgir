@@ -1,7 +1,4 @@
-use std::{
-    iter::{FusedIterator, Map},
-    ops::Mul,
-};
+use std::{iter::Map, ops::Mul};
 
 use nalgebra::{ClosedAdd, RealField, Rotation2, Similarity, Translation};
 
@@ -12,104 +9,75 @@ use crate::{
 
 use super::{
     coordinate::Coordinate,
-    coordinate::{LenCo, MulAsScalar},
+    coordinate::MulAsScalar,
+    curve::{Area, Curve},
 };
 
-pub trait IntoTransfer<Q: Quantity, S: Iterator<Item = Coordinate<Q>>> {
-    fn into_transfer(self) -> Transfer<Q, S>;
+pub struct MulOpClosure<M> {
+    pub m: M,
 }
 
-impl<Q, S> IntoTransfer<Q, S> for S
+impl<S, M> FnOnce<(S,)> for MulOpClosure<M>
+where
+    for<'a> &'a M: Mul<S, Output = S>,
+{
+    type Output = S;
+    extern "rust-call" fn call_once(self, args: (S,)) -> Self::Output {
+        &self.m * args.0
+    }
+}
+
+impl<S, M> FnMut<(S,)> for MulOpClosure<M>
+where
+    for<'a> &'a M: Mul<S, Output = S>,
+{
+    extern "rust-call" fn call_mut(&mut self, args: (S,)) -> Self::Output {
+        (&self.m) * args.0
+    }
+}
+
+impl<S, M> Fn<(S,)> for MulOpClosure<M>
+where
+    for<'a> &'a M: Mul<S, Output = S>,
+{
+    extern "rust-call" fn call(&self, args: (S,)) -> Self::Output {
+        (&self.m) * args.0
+    }
+}
+
+pub trait Transfer<Q>: Sized
 where
     Q: Quantity,
-    S: Iterator<Item = Coordinate<Q>>,
 {
-    fn into_transfer(self) -> Transfer<Q, S> {
-        Transfer { s: self }
-    }
-}
-
-pub struct Transfer<Q: Quantity, S: Iterator<Item = Coordinate<Q>>> {
-    s: S,
-}
-
-impl<Q, S> Iterator for Transfer<Q, S>
-where
-    Q: Quantity,
-    S: Iterator<Item = Coordinate<Q>>,
-{
-    type Item = Coordinate<Q>;
-    fn next(&mut self) -> Option<Self::Item> {
-        self.s.next()
-    }
-}
-
-impl<Q, S> DoubleEndedIterator for Transfer<Q, S>
-where
-    Q: Quantity,
-    S: DoubleEndedIterator<Item = Coordinate<Q>>,
-{
-    fn next_back(&mut self) -> Option<Self::Item> {
-        self.s.next_back()
-    }
-}
-
-impl<Q, S> ExactSizeIterator for Transfer<Q, S>
-where
-    Q: Quantity,
-    S: ExactSizeIterator<Item = Coordinate<Q>>,
-{
-    fn len(&self) -> usize {
-        self.s.len()
-    }
-}
-
-impl<Q: Quantity, S> FusedIterator for Transfer<Q, S> where S: FusedIterator<Item = Coordinate<Q>> {}
-
-impl<Q: Quantity, S: Iterator<Item = Coordinate<Q>>> Transfer<Q, S> {
-    pub fn new(s: S) -> Self {
-        Self { s }
-    }
-    pub fn into_inner(self) -> S {
-        self.s
-    }
-    pub fn transfer<F: FnMut(Coordinate<Q>) -> Coordinate<Q>>(
-        self,
-        f: F,
-    ) -> Transfer<Q, Map<S, F>> {
-        Transfer::new(self.s.map(f))
-    }
-    pub fn matrix_trans<M>(
-        self,
-        m: M,
-    ) -> Transfer<Q, Map<S, impl FnMut(Coordinate<Q>) -> Coordinate<Q>>>
+    type Output<F: FnMut(Coordinate<Q>) -> Coordinate<Q>>;
+    fn transfer<F: FnMut(Coordinate<Q>) -> Coordinate<Q>>(self, f: F) -> Self::Output<F>;
+    fn matrix_trans<M>(self, m: M) -> Self::Output<MulOpClosure<M>>
     where
-        M: Mul<Coordinate<Q>, Output = Coordinate<Q>> + Copy,
+        for<'a> &'a M: Mul<Coordinate<Q>, Output = Coordinate<Q>> + Copy,
     {
-        self.transfer(move |s: Coordinate<Q>| -> Coordinate<Q> { m * s })
+        self.transfer(MulOpClosure { m })
     }
 }
 
-impl<L, T, S> Transfer<Length<L, T>, S>
+pub trait CommonTrans<L, T>: Transfer<Length<L, T>>
 where
     L: LengthType,
     T: Num,
-    S: Iterator<Item = LenCo<L, T>>,
 {
-    pub fn translate(
+    fn translate(
         self,
         x: Length<L, T>,
         y: Length<L, T>,
-    ) -> Transfer<Length<L, T>, Map<S, impl FnMut(LenCo<L, T>) -> LenCo<L, T>>>
+    ) -> Self::Output<MulOpClosure<MulAsScalar<Translation<T, 2>>>>
     where
         T: ClosedAdd + Copy,
     {
         self.matrix_trans(MulAsScalar(Translation::<T, 2>::from([x.value, y.value])))
     }
-    pub fn scale(
+    fn scale(
         self,
         scale: T,
-    ) -> Transfer<Length<L, T>, Map<S, impl FnMut(LenCo<L, T>) -> LenCo<L, T>>>
+    ) -> Self::Output<MulOpClosure<MulAsScalar<Similarity<T, Rotation2<T>, 2>>>>
     where
         T: RealField + Copy,
     {
@@ -117,10 +85,7 @@ where
             scale,
         )))
     }
-    pub fn rotate(
-        self,
-        ang: Angle<T>,
-    ) -> Transfer<Length<L, T>, Map<S, impl FnMut(LenCo<L, T>) -> LenCo<L, T>>>
+    fn rotate(self, ang: Angle<T>) -> Self::Output<MulOpClosure<MulAsScalar<Rotation2<T>>>>
     where
         T: RealField + Copy,
     {
@@ -128,11 +93,39 @@ where
     }
 }
 
+impl<L, T, U> CommonTrans<L, T> for U
+where
+    L: LengthType,
+    T: Num,
+    U: Transfer<Length<L, T>>,
+{
+}
+impl<Q: Quantity, C: IntoIterator<Item = Coordinate<Q>>> Transfer<Q> for Curve<C> {
+    type Output<F: FnMut(Coordinate<Q>) -> Coordinate<Q>> = Curve<Map<C::IntoIter, F>>;
+    fn transfer<F: FnMut(Coordinate<Q>) -> Coordinate<Q>>(self, f: F) -> Self::Output<F> {
+        Curve {
+            curve: self.curve.into_iter().map(f),
+        }
+    }
+}
+
+impl<Q: Quantity, A: IntoIterator<Item = Coordinate<Q>>> Transfer<Q> for Area<A> {
+    type Output<F: FnMut(Coordinate<Q>) -> Coordinate<Q>> = Area<Map<A::IntoIter, F>>;
+    fn transfer<F: FnMut(Coordinate<Q>) -> Coordinate<Q>>(self, f: F) -> Self::Output<F> {
+        Area {
+            area: self.area.into_iter().map(f),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use float_cmp::ApproxEq;
 
-    use crate::{draw::APROX_EQ_MARGIN, MILLIMETER};
+    use crate::{
+        draw::{curve::IntoCurve, APROX_EQ_MARGIN},
+        MILLIMETER,
+    };
 
     use super::*;
     #[test]
@@ -140,23 +133,26 @@ mod tests {
         let coor = Coordinate::from((MILLIMETER, MILLIMETER * 2.));
         assert_eq!(
             std::iter::once(coor)
-                .into_transfer()
+                .into_curve()
                 .scale(2.)
+                .into_iter()
                 .next()
                 .unwrap(),
             Coordinate::from((MILLIMETER * 2., MILLIMETER * 4.))
         );
         assert_eq!(
             std::iter::once(coor)
-                .into_transfer()
+                .into_curve()
                 .translate(MILLIMETER, MILLIMETER * -1.)
+                .into_iter()
                 .next()
                 .unwrap(),
             Coordinate::from((MILLIMETER * 2., MILLIMETER))
         );
         assert!(std::iter::once(coor)
-            .into_transfer()
+            .into_curve()
             .rotate(Angle::from_deg(90.))
+            .into_iter()
             .next()
             .unwrap()
             .approx_eq(
