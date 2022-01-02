@@ -4,7 +4,6 @@ use log::warn;
 use std::{
     fmt::{Debug, Display},
     marker::PhantomData,
-    ops::Neg,
 };
 use units::{AbsoluteLength, Length, LengthType};
 
@@ -37,9 +36,9 @@ impl<T> Num for T where
 {
 }
 
-pub trait Quantity: 'static + Clone + Debug + Neg + num::Zero + PartialEq + PartialOrd {}
+pub trait Quantity: 'static + Clone + Debug + num::Zero + PartialEq + PartialOrd {}
 
-impl<T> Quantity for T where T: 'static + Clone + Debug + Neg + num::Zero + PartialEq + PartialOrd {}
+impl<T> Quantity for T where T: 'static + Clone + Debug + num::Zero + PartialEq + PartialOrd {}
 
 const MAX_POINTS_NUM: usize = 8191;
 

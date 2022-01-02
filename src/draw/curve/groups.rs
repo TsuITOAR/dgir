@@ -1,5 +1,7 @@
 use crate::{draw::coordinate::Coordinate, Quantity};
 
+use super::Area;
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Compound<T1, T2>(pub(crate) T1, pub(crate) T2);
 
@@ -27,19 +29,6 @@ where
     }
 }
 
-pub trait IntoCompound<T1, T2> {
-    fn into_compound(self) -> Compound<T1, T2>;
-}
-
-impl<T1, T2, F> IntoCompound<T1, T2> for F
-where
-    F: Into<Compound<T1, T2>>,
-{
-    fn into_compound(self) -> Compound<T1, T2> {
-        self.into()
-    }
-}
-
 impl<T1, T2, Q> From<(T1, T2)> for Compound<T1, T2>
 where
     Q: Quantity,
@@ -51,27 +40,33 @@ where
     }
 }
 
-pub trait IntoGroup<T> {
-    fn into_group(self) -> Group<T>;
-}
-
-impl<Q, T, const LEN: usize> IntoGroup<T> for [T; LEN]
+impl<Q, T, const LEN: usize> From<[T; LEN]> for Group<T>
 where
     Q: Quantity,
     T: IntoIterator<Item = Coordinate<Q>>,
 {
-    fn into_group(self) -> Group<T> {
-        Group(Vec::from(self))
+    fn from(f: [T; LEN]) -> Self {
+        Self(Vec::from(f))
     }
 }
 
-impl<Q, T> IntoGroup<T> for Vec<T>
+impl<Q, T> From<Vec<T>> for Group<T>
 where
     Q: Quantity,
     T: IntoIterator<Item = Coordinate<Q>>,
 {
-    fn into_group(self) -> Group<T> {
-        Group(self)
+    fn from(f: Vec<T>) -> Self {
+        Self(f)
+    }
+}
+
+impl<Q, T> From<(T, T)> for Group<T>
+where
+    Q: Quantity,
+    T: IntoIterator<Item = Coordinate<Q>>,
+{
+    fn from(f: (T, T)) -> Self {
+        Self(Vec::from([f.0, f.1]))
     }
 }
 
@@ -100,57 +95,65 @@ where
     }
 }
 
-impl<Q, T> From<Vec<T>> for Group<T>
-where
-    Q: Quantity,
-    T: IntoIterator<Item = Coordinate<Q>>,
-{
-    fn from(f: Vec<T>) -> Self {
-        Self(f)
-    }
-}
-
-impl<Q, T> From<(T, T)> for Group<T>
-where
-    Q: Quantity,
-    T: IntoIterator<Item = Coordinate<Q>>,
-{
-    fn from(f: (T, T)) -> Self {
-        Self(Vec::from([f.0, f.1]))
-    }
-}
-
 pub trait GraphIterator<'a, Q: Quantity> {
     type GraphIter: Iterator<Item = Self::PointIter> + 'a;
     type PointIter: Iterator<Item = Coordinate<Q>> + 'a;
     fn unzip(self) -> Self::GraphIter;
 }
 
+impl<'a, Q, A> GraphIterator<'a, Q> for Area<A>
+where
+    Q: Quantity,
+    Area<A>: IntoIterator<Item = Coordinate<Q>> + 'a,
+{
+    type GraphIter = std::iter::Once<<Self as IntoIterator>::IntoIter>;
+    type PointIter = <Self as IntoIterator>::IntoIter;
+    fn unzip(self) -> Self::GraphIter {
+        std::iter::once(self.into_iter())
+    }
+}
+
 impl<'a, T1, T2, Q> GraphIterator<'a, Q> for Compound<T1, T2>
 where
     Q: Quantity,
-    T1: Iterator<Item = Coordinate<Q>> + 'a,
-    T2: Iterator<Item = Coordinate<Q>> + 'a,
+    T1: GraphIterator<'a, Q>,
+    T2: GraphIterator<'a, Q>,
 {
-    type GraphIter = <Vec<Self::PointIter> as IntoIterator>::IntoIter;
+    type GraphIter = std::iter::Chain<
+        std::iter::Map<
+            <T1 as GraphIterator<'a, Q>>::GraphIter,
+            fn(<T1 as GraphIterator<'a, Q>>::PointIter) -> Self::PointIter,
+        >,
+        std::iter::Map<
+            <T2 as GraphIterator<'a, Q>>::GraphIter,
+            fn(<T2 as GraphIterator<'a, Q>>::PointIter) -> Self::PointIter,
+        >,
+    >;
     type PointIter = Box<dyn Iterator<Item = Coordinate<Q>> + 'a>;
     fn unzip(self) -> Self::GraphIter {
-        vec![
-            Box::new(self.0) as Self::PointIter,
-            Box::new(self.1) as Self::PointIter,
-        ]
-        .into_iter()
+        self.0
+            .unzip()
+            .map((|i| Box::new(i) as Self::PointIter) as fn(_) -> _)
+            .chain(
+                self.1
+                    .unzip()
+                    .map((|i| Box::new(i) as Self::PointIter) as fn(_) -> _),
+            )
     }
 }
 
 impl<'a, T, Q> GraphIterator<'a, Q> for Group<T>
 where
     Q: Quantity,
-    T: Iterator<Item = Coordinate<Q>> + 'a,
+    T: GraphIterator<'a, Q> + 'a,
 {
-    type GraphIter = <Vec<Self::PointIter> as IntoIterator>::IntoIter;
-    type PointIter = T;
+    type GraphIter =
+        std::iter::Flatten<std::iter::Map<std::vec::IntoIter<T>, fn(T) -> T::GraphIter>>;
+    type PointIter = T::PointIter;
     fn unzip(self) -> Self::GraphIter {
-        self.0.into_iter()
+        self.0
+            .into_iter()
+            .map((|x: T| x.unzip()) as fn(_) -> _)
+            .flatten()
     }
 }

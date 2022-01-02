@@ -94,31 +94,35 @@ where
     }
 }
 
-#[test]
-fn close_curve() {
-    fn to_coordinate(a: f64) -> Coordinate<f64> {
-        Coordinate::from([a, a + 1.])
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn close_curve() {
+        fn to_coordinate(a: f64) -> Coordinate<f64> {
+            Coordinate::from([a, a + 1.])
+        }
+        let c1 = vec![1., 2., 3.];
+        let it1 = c1.iter().map(|x| to_coordinate(*x));
+        assert_eq!(
+            it1.clone().into_curve().close().into_iter().last(),
+            to_coordinate(1.).into()
+        );
+        assert_eq!(
+            it1.clone().into_curve().close().into_iter().count(),
+            c1.len() + 1
+        );
+        let c2 = vec![1., 1., 1.];
+        let it2 = c2.iter().map(|x| to_coordinate(*x));
+        assert_eq!(
+            it2.clone().into_curve().close().into_iter().last(),
+            to_coordinate(1.).into()
+        );
+        assert_eq!(
+            it2.clone().into_curve().close().into_iter().count(),
+            c2.len()
+        );
     }
-    let c1 = vec![1., 2., 3.];
-    let it1 = c1.iter().map(|x| to_coordinate(*x));
-    assert_eq!(
-        it1.clone().into_curve().close().into_iter().last(),
-        to_coordinate(1.).into()
-    );
-    assert_eq!(
-        it1.clone().into_curve().close().into_iter().count(),
-        c1.len() + 1
-    );
-    let c2 = vec![1., 1., 1.];
-    let it2 = c2.iter().map(|x| to_coordinate(*x));
-    assert_eq!(
-        it2.clone().into_curve().close().into_iter().last(),
-        to_coordinate(1.).into()
-    );
-    assert_eq!(
-        it2.clone().into_curve().close().into_iter().count(),
-        c2.len()
-    );
 }
 
 impl<Q, C> IntoIterator for Curve<C>

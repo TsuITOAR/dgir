@@ -127,3 +127,41 @@ where
         self.matrix_trans(MulAsScalar(Rotation2::new(ang.to_rad())))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use float_cmp::ApproxEq;
+
+    use crate::{draw::APROX_EQ_MARGIN, MILLIMETER};
+
+    use super::*;
+    #[test]
+    fn trans_coordinate() {
+        let coor = Coordinate::from((MILLIMETER, MILLIMETER * 2.));
+        assert_eq!(
+            std::iter::once(coor)
+                .into_transfer()
+                .scale(2.)
+                .next()
+                .unwrap(),
+            Coordinate::from((MILLIMETER * 2., MILLIMETER * 4.))
+        );
+        assert_eq!(
+            std::iter::once(coor)
+                .into_transfer()
+                .translate(MILLIMETER, MILLIMETER * -1.)
+                .next()
+                .unwrap(),
+            Coordinate::from((MILLIMETER * 2., MILLIMETER))
+        );
+        assert!(std::iter::once(coor)
+            .into_transfer()
+            .rotate(Angle::from_deg(90.))
+            .next()
+            .unwrap()
+            .approx_eq(
+                Coordinate::from((MILLIMETER * -2., MILLIMETER)),
+                APROX_EQ_MARGIN
+            ),);
+    }
+}

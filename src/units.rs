@@ -30,6 +30,19 @@ impl<T: LengthType, S: Display> Display for Length<T, S> {
     }
 }
 
+impl<M, T, S> float_cmp::ApproxEq for Length<T, S>
+where
+    M: Copy + Default,
+    T: LengthType,
+    S: float_cmp::ApproxEq<Margin = M>,
+{
+    type Margin = M;
+    fn approx_eq<N: Into<Self::Margin>>(self, other: Self, margin: N) -> bool {
+        let margin = margin.into();
+        self.value.approx_eq(other.value, margin)
+    }
+}
+
 impl<S> Length<Absolute, S> {
     pub fn new_absolute<U>(value: S) -> Length<Absolute, S>
     where

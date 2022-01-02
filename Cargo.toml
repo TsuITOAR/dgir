@@ -12,6 +12,8 @@ num = "*"
 log = "*"
 rayon = { version = "*", optional = true }
 nalgebra = { version = "*", optional = true }
+float-cmp = "*"
+
 
 [features]
 default = ["rayon", "nalgebra"]

@@ -1,7 +1,7 @@
 use std::{iter::Map, ops::AddAssign};
 
 use log::warn;
-use nalgebra::Vector2;
+use nalgebra::{RealField, Rotation2, Vector2};
 use num::{traits::FloatConst, Float, FromPrimitive, ToPrimitive, Zero};
 
 use crate::{
@@ -11,12 +11,15 @@ use crate::{
 
 use self::{
     coordinate::{Coordinate, LenCo},
-    curve::{Bias, Split},
+    curve::{Bias, Split, SplitHalf},
 };
 
 pub mod coordinate;
 pub mod curve;
 pub mod transfer;
+
+#[cfg(test)]
+const APROX_EQ_MARGIN: (f64, i64) = (0., 1);
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub enum Resolution<T = Length<Absolute, f64>> {
@@ -137,27 +140,24 @@ where
                 pos, self.angle.0, self.angle.1
             );
         }
-        let (res_left, res_right) = match self.resolution {
-            Resolution::MinDistance(d) => (Resolution::MinDistance(d), Resolution::MinDistance(d)),
+        let res = match self.resolution {
+            Resolution::MinDistance(d) => Resolution::MinDistance(d),
             Resolution::MinNumber(n) => {
                 let min_dis: Length<L, T> = (self.inner.radius
                     * (self.angle.1 - self.angle.0).to_rad().abs())
                     / T::from_usize(n).unwrap();
-                (
-                    Resolution::MinDistance(min_dis),
-                    Resolution::MinDistance(min_dis),
-                )
+                Resolution::MinDistance(min_dis)
             }
         };
         (
             Self {
-                angle: (self.angle.0, self.angle.0 + pos),
-                resolution: res_left,
+                angle: (self.angle.0, pos),
+                resolution: res,
                 ..self
             },
             Self {
-                angle: (self.angle.0 + pos, self.angle.1),
-                resolution: res_right,
+                angle: (pos, self.angle.1),
+                resolution: res,
                 ..self
             },
         )
@@ -172,5 +172,178 @@ where
     fn split(self, pos: Length<L, T>) -> (Self, Self) {
         let angle = Angle::from_deg(pos / self.inner.radius);
         self.split(angle)
+    }
+}
+
+impl<L, T> SplitHalf<Angle<T>> for CircularArc<L, T>
+where
+    L: LengthType,
+    T: Num + Float + FloatConst + FromPrimitive,
+{
+    fn split_half(self) -> (Self, Self) {
+        self.split((self.angle.0 + self.angle.1) / T::from_u8(2).unwrap())
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Line<L = Absolute, T = f64>
+where
+    L: LengthType,
+    T: Num,
+{
+    start: LenCo<L, T>,
+    end: LenCo<L, T>,
+}
+
+impl<L, T> Line<L, T>
+where
+    L: LengthType,
+    T: Num,
+{
+    pub fn new<S: Into<LenCo<L, T>>, E: Into<LenCo<L, T>>>(sta: S, end: E) -> Self {
+        Self {
+            start: sta.into(),
+            end: end.into(),
+        }
+    }
+}
+
+impl<L, T> IntoIterator for Line<L, T>
+where
+    L: LengthType,
+    T: Num,
+{
+    type IntoIter = <[LenCo<L, T>; 2] as IntoIterator>::IntoIter;
+    type Item = LenCo<L, T>;
+    fn into_iter(self) -> Self::IntoIter {
+        [self.start, self.end].into_iter()
+    }
+}
+
+impl<L, T> Bias<Length<L, T>> for Line<L, T>
+where
+    L: LengthType,
+    T: Num + RealField,
+{
+    fn bias(&mut self, b: Length<L, T>) {
+        let mut v: Vector2<T> = Vector2::from(self.end.to_basic().0 - self.start.to_basic().0);
+        v.normalize_mut();
+        let t = Rotation2::new(T::frac_pi_2());
+        let v: Vector2<T> = (t * v) * b.value;
+        self.start = LenCo::from_basic(self.start.to_basic() + v);
+        self.end = LenCo::from_basic(self.end.to_basic() + v);
+    }
+}
+
+impl<L, T> Split<Length<L, T>> for Line<L, T>
+where
+    L: LengthType,
+    T: Num + RealField,
+{
+    fn split(self, pos: Length<L, T>) -> (Self, Self) {
+        let mid_pos: LenCo<L, T> = {
+            let mut v: Vector2<T> = Vector2::from(self.end.to_basic().0 - self.start.to_basic().0);
+            v.normalize_mut();
+            LenCo::from_basic(self.start.to_basic() + v * pos.value)
+        };
+        (
+            Self {
+                start: self.start,
+                end: mid_pos,
+            },
+            Self {
+                start: mid_pos,
+                end: self.end,
+            },
+        )
+    }
+}
+impl<L, T> SplitHalf<Length<L, T>> for Line<L, T>
+where
+    L: LengthType,
+    T: Num + RealField,
+{
+    fn split_half(self) -> (Self, Self) {
+        let mid_pos = LenCo::from_basic(Coordinate::<T>::from(nalgebra::center(
+            &self.start.to_basic().0,
+            &self.end.to_basic().0,
+        )));
+        (
+            Self {
+                start: self.start,
+                end: mid_pos,
+            },
+            Self {
+                start: mid_pos,
+                end: self.end,
+            },
+        )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::MILLIMETER;
+
+    use super::*;
+    use float_cmp::ApproxEq;
+
+    #[test]
+    fn bias_line() {
+        let mut line = Line::new((MILLIMETER, MILLIMETER), (MILLIMETER * 2., MILLIMETER * 2.));
+        line.bias(MILLIMETER * (2.).sqrt());
+        assert!(line.start.approx_eq(
+            LenCo::from((MILLIMETER * 0., MILLIMETER * 2.)),
+            APROX_EQ_MARGIN
+        ));
+        assert!(line.end.approx_eq(
+            LenCo::from((MILLIMETER * 1., MILLIMETER * 3.)),
+            APROX_EQ_MARGIN
+        ),);
+        line.bias(MILLIMETER * (2.).sqrt() * (-2.));
+        assert!(line.start.approx_eq(
+            LenCo::from((MILLIMETER * 2., MILLIMETER * 0.)),
+            APROX_EQ_MARGIN
+        ));
+        assert!(line.end.approx_eq(
+            LenCo::from((MILLIMETER * 3., MILLIMETER * 1.)),
+            APROX_EQ_MARGIN
+        ),);
+    }
+    #[test]
+    fn split_line() {
+        let line = Line::new(
+            (MILLIMETER * 0., MILLIMETER),
+            (MILLIMETER * 0., MILLIMETER * 2.),
+        );
+        let (lower, upper) = line.clone().split(MILLIMETER / 3.);
+        assert!(lower.start.approx_eq(line.start, APROX_EQ_MARGIN));
+
+        assert!(lower.end.approx_eq(
+            LenCo::from((MILLIMETER * 0., MILLIMETER + MILLIMETER / 3.)),
+            APROX_EQ_MARGIN
+        ));
+
+        assert!(upper.start.approx_eq(
+            LenCo::from((MILLIMETER * 0., MILLIMETER + MILLIMETER / 3.)),
+            APROX_EQ_MARGIN
+        ));
+
+        assert!(upper.end.approx_eq(line.end, APROX_EQ_MARGIN));
+
+        let (lower, upper) = line.clone().split_half();
+        assert!(lower.start.approx_eq(line.start, APROX_EQ_MARGIN));
+
+        assert!(lower.end.approx_eq(
+            LenCo::from((MILLIMETER * 0., MILLIMETER + MILLIMETER / 2.)),
+            APROX_EQ_MARGIN
+        ));
+
+        assert!(upper.start.approx_eq(
+            LenCo::from((MILLIMETER * 0., MILLIMETER + MILLIMETER / 2.)),
+            APROX_EQ_MARGIN
+        ));
+
+        assert!(upper.end.approx_eq(line.end, APROX_EQ_MARGIN));
     }
 }
