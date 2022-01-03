@@ -391,6 +391,7 @@ mod tests {
             Line::new((MICROMETER, MICROMETER), (MICROMETER * 2., MICROMETER * 2.)),
             [MICROMETER / 4.].into(),
         );
-        c.assemble(rect.into_group());
+        let rect = c.assemble(rect.into_group());
+        
     }
 }
