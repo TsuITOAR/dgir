@@ -2,6 +2,7 @@
 #![feature(generic_associated_types)]
 #![feature(unboxed_closures)]
 #![feature(fn_traits)]
+
 use gds21::GdsPoint;
 use log::{info, warn};
 use std::{
@@ -10,6 +11,7 @@ use std::{
 };
 use units::{AbsoluteLength, Length, LengthType};
 
+pub mod cursor;
 pub mod color;
 pub mod draw;
 pub mod gds;

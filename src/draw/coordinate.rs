@@ -137,6 +137,16 @@ where
     }
 }
 
+impl<Q> Add<Coordinate<Q>> for Coordinate<Q>
+where
+    Q: Quantity + Add<Output = Q> + Copy,
+{
+    type Output = Self;
+    fn add(self, rhs: Coordinate<Q>) -> Self::Output {
+        Self::from([self.0[0] + rhs.0[0], self.0[1] + rhs.0[1]])
+    }
+}
+
 impl<S, Q: Quantity> Sub<S> for Coordinate<Q>
 where
     Point2<Q>: Sub<S, Output = Point2<Q>>,
@@ -147,6 +157,15 @@ where
     }
 }
 
+impl<Q> Sub<Coordinate<Q>> for Coordinate<Q>
+where
+    Q: Quantity + Sub<Output = Q> + Copy,
+{
+    type Output = Self;
+    fn sub(self, rhs: Coordinate<Q>) -> Self::Output {
+        Self::from([self.0[0] - rhs.0[0], self.0[1] - rhs.0[1]])
+    }
+}
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct MulAsScalar<M>(pub(crate) M);
 

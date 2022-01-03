@@ -53,7 +53,8 @@ pub trait Transfer<Q>: Sized
 where
     Q: Quantity,
 {
-    type Output<F: FnMut(Coordinate<Q>) -> Coordinate<Q> + Clone>;
+    type Output<F: FnMut(Coordinate<Q>) -> Coordinate<Q> + Clone>: Transfer<Q>
+        + IntoIterator<Item = Coordinate<Q>>;
     fn transfer<F: FnMut(Coordinate<Q>) -> Coordinate<Q> + Clone>(self, f: F) -> Self::Output<F>;
     fn matrix_trans<M: Clone>(self, m: M) -> Self::Output<MulOpClosure<M>>
     where
@@ -104,6 +105,7 @@ where
     U: Transfer<Length<L, T>>,
 {
 }
+
 impl<Q: Quantity, C: IntoIterator<Item = Coordinate<Q>>> Transfer<Q> for Curve<C> {
     type Output<F: FnMut(Coordinate<Q>) -> Coordinate<Q> + Clone> = Curve<Map<C::IntoIter, F>>;
     fn transfer<F: FnMut(Coordinate<Q>) -> Coordinate<Q> + Clone>(self, f: F) -> Self::Output<F> {

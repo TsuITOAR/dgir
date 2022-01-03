@@ -98,7 +98,7 @@ impl<Q: Quantity> Default for ElementsGroup<Q> {
 }
 
 impl<Q: Quantity> ElementsGroup<Q> {
-    fn as_vec(&mut self) -> &mut Vec<Element<Q>> {
+    pub(crate) fn as_vec(&mut self) -> &mut Vec<Element<Q>> {
         let s = std::mem::take(self);
         let g = match s {
             Self::Group(g) => g,
@@ -111,7 +111,7 @@ impl<Q: Quantity> ElementsGroup<Q> {
             unreachable!()
         }
     }
-    fn into_vec(self) -> Vec<Element<Q>> {
+    pub(crate) fn into_vec(self) -> Vec<Element<Q>> {
         match self {
             Self::Single(s) => vec![s],
             Self::Group(g) => g,

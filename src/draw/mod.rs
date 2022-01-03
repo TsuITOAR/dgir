@@ -28,8 +28,8 @@ pub enum Resolution<T = Length<Absolute, f64>> {
 }
 
 #[derive(Debug, Clone, Copy)]
-struct _Arc<S> {
-    radius: S,
+pub(crate) struct _Arc<S> {
+    pub(crate) radius: S,
 }
 
 impl<L, T> _Arc<Length<L, T>>
@@ -70,10 +70,10 @@ where
     L: LengthType,
     T: Num,
 {
-    inner: _Arc<Length<L, T>>,
-    center: (Length<L, T>, Length<L, T>),
-    angle: (Angle<T>, Angle<T>),
-    resolution: Resolution<Length<L, T>>,
+    pub(crate) inner: _Arc<Length<L, T>>,
+    pub(crate) center: (Length<L, T>, Length<L, T>),
+    pub(crate) angle: (Angle<T>, Angle<T>),
+    pub(crate) resolution: Resolution<Length<L, T>>,
 }
 
 impl<L, T> CircularArc<L, T>
@@ -191,8 +191,8 @@ where
     L: LengthType,
     T: Num,
 {
-    start: LenCo<L, T>,
-    end: LenCo<L, T>,
+   pub(crate) start: LenCo<L, T>,
+   pub(crate) end: LenCo<L, T>,
 }
 
 impl<L, T> Line<L, T>
