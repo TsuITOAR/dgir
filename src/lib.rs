@@ -11,8 +11,8 @@ use std::{
 };
 use units::{AbsoluteLength, Length, LengthType};
 
-pub mod cursor;
 pub mod color;
+pub mod cursor;
 pub mod draw;
 pub mod gds;
 pub mod units;
@@ -111,12 +111,12 @@ fn split_polygon<T: Clone + PartialEq + Debug>(mut raw: Vec<T>, max_points: usiz
     if raw.is_empty() {
         return Vec::new();
     }
-    let len = if raw.first() == raw.last() {
-        raw.len() - 1
-    } else {
-        raw.len()
-    };
     if raw.len() > max_points {
+        let len = if raw.first() == raw.last() {
+            raw.len() - 1
+        } else {
+            raw.len()
+        };
         info!("auto splitting polygon");
         let mut ret = Vec::new();
         let mut temp = Vec::with_capacity(len / 2 + 2);
@@ -134,8 +134,8 @@ fn split_polygon<T: Clone + PartialEq + Debug>(mut raw: Vec<T>, max_points: usiz
 
 fn split_path<T: Clone + Debug>(mut raw: Vec<T>, max_points: usize) -> Vec<Vec<T>> {
     assert!(max_points > 2);
-    let len = raw.len();
     if raw.len() > max_points {
+        let len = raw.len();
         info!("auto splitting path");
         let mut ret = Vec::new();
         let mut temp = Vec::with_capacity(len / 2 + 1);

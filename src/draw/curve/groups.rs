@@ -93,16 +93,16 @@ where
 }
 
 // ! this trait not used yet
-pub trait GraphIterator<'a, Q: Quantity>: Sized {
-    type GraphIter: Iterator<Item = Self::PointIter> + 'a;
-    type PointIter: Iterator<Item = Coordinate<Q>> + 'a;
+pub trait GraphIterator<Q: Quantity>: Sized {
+    type GraphIter: Iterator<Item = Self::PointIter>;
+    type PointIter: Iterator<Item = Coordinate<Q>>;
     fn unzip(self) -> Self::GraphIter;
 }
 
-impl<'a, Q, A> GraphIterator<'a, Q> for Area<A>
+impl<Q, A> GraphIterator<Q> for Area<A>
 where
     Q: Quantity,
-    Area<A>: IntoIterator<Item = Coordinate<Q>> + 'a,
+    Area<A>: IntoIterator<Item = Coordinate<Q>>,
 {
     type GraphIter = std::iter::Once<<Self as IntoIterator>::IntoIter>;
     type PointIter = <Self as IntoIterator>::IntoIter;
@@ -111,23 +111,25 @@ where
     }
 }
 
-impl<'a, T1, T2, Q> GraphIterator<'a, Q> for Compound<T1, T2>
+impl<T1, T2, Q> GraphIterator<Q> for Compound<T1, T2>
 where
     Q: Quantity,
-    T1: GraphIterator<'a, Q>,
-    T2: GraphIterator<'a, Q>,
+    T1: GraphIterator<Q>,
+    <T1 as GraphIterator<Q>>::PointIter: 'static,
+    T2: GraphIterator<Q>,
+    <T2 as GraphIterator<Q>>::PointIter: 'static,
 {
     type GraphIter = std::iter::Chain<
         std::iter::Map<
-            <T1 as GraphIterator<'a, Q>>::GraphIter,
-            fn(<T1 as GraphIterator<'a, Q>>::PointIter) -> Self::PointIter,
+            <T1 as GraphIterator<Q>>::GraphIter,
+            fn(<T1 as GraphIterator<Q>>::PointIter) -> Self::PointIter,
         >,
         std::iter::Map<
-            <T2 as GraphIterator<'a, Q>>::GraphIter,
-            fn(<T2 as GraphIterator<'a, Q>>::PointIter) -> Self::PointIter,
+            <T2 as GraphIterator<Q>>::GraphIter,
+            fn(<T2 as GraphIterator<Q>>::PointIter) -> Self::PointIter,
         >,
     >;
-    type PointIter = Box<dyn Iterator<Item = Coordinate<Q>> + 'a>;
+    type PointIter = Box<dyn Iterator<Item = Coordinate<Q>>>;
     fn unzip(self) -> Self::GraphIter {
         self.0
             .unzip()
@@ -140,10 +142,10 @@ where
     }
 }
 
-impl<'a, T, Q> GraphIterator<'a, Q> for Group<T>
+impl<T, Q> GraphIterator<Q> for Group<T>
 where
     Q: Quantity,
-    T: GraphIterator<'a, Q> + 'a,
+    T: GraphIterator<Q>,
 {
     type GraphIter =
         std::iter::Flatten<std::iter::Map<std::vec::IntoIter<T>, fn(T) -> T::GraphIter>>;

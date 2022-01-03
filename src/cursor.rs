@@ -1,7 +1,10 @@
+use std::mem;
+
 use nalgebra::{RealField, Rotation, Translation};
 use num::{traits::FloatConst, Float, FromPrimitive, Zero};
 
 use crate::{
+    color::{Colour, LayerData},
     draw::{
         coordinate::{Coordinate, LenCo, MulAsScalar},
         curve::{
@@ -9,10 +12,11 @@ use crate::{
             Area, Curve, Sweep,
         },
         transfer::{CommonTrans, MulOpClosure, Transfer},
-        CircularArc, Line,
+        CircularArc, Line, Resolution,
     },
+    gds::DgirCell,
     units::{Absolute, Angle, Length, LengthType},
-    Num, Quantity,
+    zero, Num, Quantity,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -21,8 +25,8 @@ where
     L: LengthType,
     T: Num,
 {
-    pos: LenCo<L, T>,
-    dir: Angle<T>,
+    pub pos: LenCo<L, T>,
+    pub dir: Angle<T>,
 }
 
 impl<L: LengthType, T: Num> Default for Cursor<L, T> {
@@ -58,6 +62,149 @@ impl<L: LengthType, T: Num> Cursor<L, T> {
         self.pos = self.pos + (end_pos - start_pos).rotate(self.dir - start_ang);
         self.dir = self.dir + end_ang - start_ang;
         e
+    }
+}
+
+#[derive(Debug)]
+pub struct CellCursor<C: Colour + Clone, L: LengthType = Absolute, T: Num = f64> {
+    pub cursor: Cursor<L, T>,
+    cell: DgirCell<Length<L, T>>,
+    pub color: C,
+}
+
+impl<C: Colour, L: LengthType, T: Num> CellCursor<C, L, T> {
+    pub fn new<S: ToString>(cell_name: S, color: C) -> Self {
+        Self {
+            cursor: Cursor::default(),
+            cell: DgirCell::new(cell_name),
+            color,
+        }
+    }
+    pub fn new_from_cell(cell: DgirCell<Length<L, T>>, color: C) -> Self {
+        Self {
+            cursor: Cursor::default(),
+            cell,
+            color,
+        }
+    }
+    pub fn mut_cell(&mut self) -> &mut DgirCell<Length<L, T>> {
+        &mut self.cell
+    }
+    pub fn into_cell(self) -> DgirCell<Length<L, T>> {
+        self.cell
+    }
+    pub fn assemble_in<E>(&mut self, e: E) -> &mut Self
+    where
+        T: RealField + Float,
+        E: CommonTrans<L, T> + Pos<Length<L, T>> + Dir<T>,
+        <<<E as Transfer<Length<L, T>>>::Output<MulOpClosure<MulAsScalar<Translation<T, 2_usize>>>> as Transfer<Length<L, T>>>::Output<MulOpClosure<MulAsScalar<Rotation<T, 2_usize>>>> as Transfer<Length<L, T>>>::Output<MulOpClosure<MulAsScalar<Translation<T, 2_usize>>>>:crate::color::Decorated<C,Quantity=Length<L,T>>,
+    {
+        self.cell
+            .push(self.color.clone().color(self.cursor.assemble(e)));
+        self
+    }
+}
+
+#[derive(Debug)]
+pub struct Assembler<W: AsRef<[Length<L, T>]>, L: LengthType = Absolute, T: Num = f64> {
+    pub cell_cur: CellCursor<Group<LayerData>, L, T>,
+    pub width: W,
+    pub res: Resolution,
+}
+
+impl<W: AsRef<[Length<L, T>]>, L: LengthType, T: Num> Assembler<W, L, T> {
+    pub fn new<S: ToString, C: Into<Group<LayerData>>>(
+        cell_name: S,
+        color: C,
+        width: W,
+        res: Resolution,
+    ) -> Self {
+        Self {
+            cell_cur: CellCursor {
+                cursor: Cursor::default(),
+                cell: DgirCell::new(cell_name),
+                color: color.into(),
+            },
+            width,
+            res,
+        }
+    }
+    pub fn new_from_cell(
+        cell: DgirCell<Length<L, T>>,
+        color: Group<LayerData>,
+        width: W,
+        res: Resolution,
+    ) -> Self {
+        Self {
+            cell_cur: CellCursor {
+                cursor: Cursor::default(),
+                cell,
+                color,
+            },
+            width,
+            res,
+        }
+    }
+    pub fn mut_cell(&mut self) -> &mut DgirCell<Length<L, T>> {
+        self.cell_cur.mut_cell()
+    }
+    pub fn into_cell(self) -> DgirCell<Length<L, T>> {
+        self.cell_cur.cell
+    }
+    pub fn set_pos<P: Into<Coordinate<Length<L, T>>>>(&mut self, p: P) -> &mut Self {
+        self.cell_cur.cursor.pos = p.into();
+        self
+    }
+    pub fn set_dir(&mut self, a: Angle<T>) -> &mut Self {
+        self.cell_cur.cursor.dir = a;
+        self
+    }
+}
+impl<W: 'static + Clone + AsRef<[Length<Absolute, f64>]>> Assembler<W, Absolute, f64> {
+    pub fn turn(&mut self, radius: Length<Absolute, f64>, a: Angle<f64>) -> &mut Self {
+        self.cell_cur.assemble_in(
+            ArcCurve::new(
+                CircularArc::new_origin(radius, (Angle::from_deg(0.), a), self.res),
+                self.width.clone(),
+            )
+            .into_group(),
+        );
+        self
+    }
+    pub fn extend(&mut self, len: Length<Absolute, f64>) -> &mut Self {
+        self.cell_cur
+            .assemble_in(Rect::from_length(len, self.width.clone()).into_group());
+        self
+    }
+    pub fn taper(&mut self, len: Length<Absolute, f64>, width: W) -> &mut Self {
+        use crate::color::Decorated;
+        let g = Group::from(
+            self.width
+                .as_ref()
+                .iter()
+                .zip(width.as_ref().iter())
+                .map(|(w1, w2)| {
+                    Area {
+                        area: [
+                            Coordinate::from([zero(), *w1 / 2.]),
+                            Coordinate::from([zero(), -*w1 / 2.]),
+                            Coordinate::from([len, -*w2 / 2.]),
+                            Coordinate::from([len, *w2 / 2.]),
+                            Coordinate::from([zero(), *w1 / 2.]),
+                        ],
+                    }
+                    .rotate(self.cell_cur.cursor.dir)
+                    .translate(self.cell_cur.cursor.pos[0], self.cell_cur.cursor.pos[1])
+                })
+                .collect::<Vec<_>>(),
+        );
+        self.cell_cur
+            .cell
+            .push(g.color(self.cell_cur.color.clone()));
+        self.cell_cur.cursor.pos = self.cell_cur.cursor.pos
+            + Coordinate::from([len, zero()]).rotate(self.cell_cur.cursor.dir);
+        self.width = width;
+        self
     }
 }
 
@@ -243,6 +390,10 @@ impl<W: AsRef<[Length<Absolute, f64>]>> ArcCurve<W> {
     pub fn new(arc: CircularArc, width: W) -> Self {
         Self { arc, width }
     }
+    pub fn rev(mut self) -> Self {
+        mem::swap(&mut self.arc.angle.0, &mut self.arc.angle.1);
+        self
+    }
     pub fn into_group(
         self,
     ) -> Group<
@@ -382,6 +533,15 @@ pub struct Rect<W: AsRef<[Length<Absolute, f64>]>> {
 impl<W: AsRef<[Length<Absolute, f64>]>> Rect<W> {
     pub fn new(line: Line, width: W) -> Self {
         Self { line, width }
+    }
+    pub fn from_length(length: Length<Absolute, f64>, width: W) -> Self {
+        Self {
+            line: Line {
+                start: [zero(), zero()].into(),
+                end: [length, zero()].into(),
+            },
+            width,
+        }
     }
     pub fn into_group(
         self,

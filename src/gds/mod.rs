@@ -181,9 +181,9 @@ impl<Q> DgirCell<Q>
 where
     Q: Quantity,
 {
-    pub fn new(name: impl Into<String>) -> Self {
+    pub fn new(name: impl ToString) -> Self {
         Self {
-            name: name.into(),
+            name: name.to_string(),
             elements: Vec::new(),
         }
     }
@@ -199,7 +199,7 @@ where
         self
     }
 
-    pub fn as_ref(self) -> Ref<Q> {
+    pub fn into_ref(self) -> Ref<Q> {
         let mut s = self;
         Ref {
             strans: None,
@@ -221,6 +221,28 @@ where
             }
         }
         dependencies
+    }
+}
+
+impl<T: Num + FromPrimitive + ToPrimitive> DgirCell<Length<Absolute, T>> {
+    pub fn save_as_lib(self, filename: impl AsRef<std::path::Path>) -> Result<()> {
+        DgirLibrary {
+            name: None,
+            units: DgirUnits::default(),
+            cells: vec![self],
+        }
+        .save(filename)
+    }
+}
+
+impl<T: Num + FromPrimitive + ToPrimitive> DgirCell<Length<Relative, T>> {
+    pub fn save_as_lib(self, filename: impl AsRef<std::path::Path>) -> Result<()> {
+        DgirLibrary {
+            name: None,
+            units: DgirUnits::default(),
+            cells: vec![self],
+        }
+        .save(filename)
     }
 }
 

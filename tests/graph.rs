@@ -1,9 +1,7 @@
-use std::time::Instant;
-
 use dgir::{
     color::Decorated,
     color::LayerData,
-    cursor::{ArcCurve, Cursor, Rect},
+    cursor::{ArcCurve, Assembler, CellCursor, Cursor, Rect},
     draw::{
         curve::{
             groups::{Compound, Group},
@@ -20,8 +18,6 @@ mod common;
 
 #[test]
 fn compound() {
-    let start = Instant::now();
-
     let mut lib = DgirLibrary::new("libname");
     let cir = CircularArc::new(
         100. * MICROMETER,
@@ -44,12 +40,10 @@ fn compound() {
 
     lib.push(topcell);
     lib.save(common::get_file_path("compound.gds")).unwrap();
-
-    println!("time costed:{}ms", start.elapsed().as_millis());
 }
 
 #[test]
-fn cursor_chain() {
+fn cursor() {
     #[allow(non_snake_case)]
     let WIDTH: [AbsoluteLength<f64>; 2] = [MICROMETER * 4., MICROMETER * 10.];
 
@@ -106,8 +100,66 @@ fn cursor_chain() {
         cur.assemble(rec.clone().into_group())
             .color(Group::from(COLOR)),
     );
+    topcell
+        .save_as_lib(common::get_file_path("cursor.gds"))
+        .unwrap();
+}
 
-    let mut lib = DgirLibrary::new("libname");
-    lib.push(topcell);
-    lib.save(common::get_file_path("cursor.gds")).unwrap();
+#[test]
+fn cell_cursor() {
+    #[allow(non_snake_case)]
+    let WIDTH: [AbsoluteLength<f64>; 2] = [MICROMETER * 4., MICROMETER * 10.];
+
+    #[allow(non_snake_case)]
+    let COLOR: [LayerData; 2] = [LayerData::new(1, 0), LayerData::new(1, 1)];
+
+    #[allow(non_snake_case)]
+    let RESOLUTION: Resolution = Resolution::MinDistance(20. * NANOMETER);
+
+    let mut cur: CellCursor<_> = CellCursor::new("topcell", Group::from(COLOR));
+    let mut cir: ArcCurve<[_; 2]> = ArcCurve::new(
+        CircularArc::new(
+            MICROMETER * 240.,
+            [zero(), zero()],
+            (Angle::from_deg(0.), Angle::from_deg(120.)),
+            RESOLUTION,
+        ),
+        WIDTH.into(),
+    );
+    let mut rec: Rect<[_; 2]> = Rect::new(
+        Line::new((zero(), zero()), (zero(), MICROMETER * 120.)),
+        WIDTH.into(),
+    );
+    cur.assemble_in(cir.into_group());
+    cur.assemble_in(rec.into_group());
+    cir.arc_mut().set_radius(MICROMETER * 200.);
+    rec.line_mut().end = [MICROMETER * 20., zero()].into();
+    cur.assemble_in(cir.into_group());
+    cur.assemble_in(rec.into_group());
+    cur.into_cell()
+        .save_as_lib(common::get_file_path("cell_cursor.gds"))
+        .unwrap();
+}
+
+#[test]
+fn assembler() {
+    #[allow(non_snake_case)]
+    let WIDTH: [AbsoluteLength<f64>; 2] = [MICROMETER * 4., MICROMETER * 10.];
+
+    #[allow(non_snake_case)]
+    let COLOR: [LayerData; 2] = [LayerData::new(1, 0), LayerData::new(1, 1)];
+
+    #[allow(non_snake_case)]
+    let RESOLUTION: Resolution = Resolution::MinDistance(20. * NANOMETER);
+
+    let mut cur: Assembler<_> = Assembler::new("topcell", Group::from(COLOR), WIDTH, RESOLUTION);
+    cur.turn(MICROMETER * 240., Angle::from_deg(120.));
+    cur.extend(MICROMETER * 120.);
+    cur.turn(MICROMETER * 200., Angle::from_deg(120.));
+    cur.extend(MICROMETER * 20.);
+    cur.taper(MICROMETER * 500., [MICROMETER * 2., MICROMETER * 8.]);
+    cur.turn(MICROMETER * 200., Angle::from_deg(120.));
+    cur.into_cell()
+        .save_as_lib(common::get_file_path("assembler.gds"))
+        .unwrap();
 }
