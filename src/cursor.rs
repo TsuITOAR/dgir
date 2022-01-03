@@ -389,7 +389,7 @@ mod tests {
         let mut c: Cursor = Cursor::new((zero(), zero()), Angle::from_deg(90f64));
         let rect = Rect::new(
             Line::new((MICROMETER, MICROMETER), (MICROMETER * 2., MICROMETER * 2.)),
-            [MICROMETER / 4.].into(),z
+            [MICROMETER / 4.].into(),
         );
         c.assemble(rect.into_group());
     }
