@@ -49,31 +49,19 @@ impl<T1, T2> From<(T1, T2)> for Compound<T1, T2> {
     }
 }
 
-impl<Q, T, const LEN: usize> From<[T; LEN]> for Group<T>
-where
-    Q: Quantity,
-    T: IntoIterator<Item = Coordinate<Q>>,
-{
+impl<T, const LEN: usize> From<[T; LEN]> for Group<T> {
     fn from(f: [T; LEN]) -> Self {
         Self(Vec::from(f))
     }
 }
 
-impl<Q, T> From<Vec<T>> for Group<T>
-where
-    Q: Quantity,
-    T: IntoIterator<Item = Coordinate<Q>>,
-{
+impl<T> From<Vec<T>> for Group<T> {
     fn from(f: Vec<T>) -> Self {
         Self(f)
     }
 }
 
-impl<Q, T> From<(T, T)> for Group<T>
-where
-    Q: Quantity,
-    T: IntoIterator<Item = Coordinate<Q>>,
-{
+impl<T> From<(T, T)> for Group<T> {
     fn from(f: (T, T)) -> Self {
         Self(Vec::from([f.0, f.1]))
     }

@@ -29,7 +29,7 @@ pub enum Resolution<T = Length<Absolute, f64>> {
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct _Arc<S> {
-    pub(crate) radius: S,
+    radius: S,
 }
 
 impl<L, T> _Arc<Length<L, T>>
@@ -37,6 +37,15 @@ where
     L: LengthType,
     T: Float + FloatConst + Num + FromPrimitive,
 {
+    pub(crate) fn new(radius: Length<L, T>) -> Self {
+        if radius.value.is_negative() {
+            warn!("a negative radius {} is set", radius);
+        }
+        Self { radius }
+    }
+    pub(crate) fn radius(&self) -> Length<L, T> {
+        self.radius
+    }
     fn to_points(
         self,
         angle: (Angle<T>, Angle<T>),
@@ -71,7 +80,7 @@ where
     T: Num,
 {
     pub(crate) inner: _Arc<Length<L, T>>,
-    pub(crate) center: (Length<L, T>, Length<L, T>),
+    pub(crate) center: Coordinate<Length<L, T>>,
     pub(crate) angle: (Angle<T>, Angle<T>),
     pub(crate) resolution: Resolution<Length<L, T>>,
 }
@@ -79,17 +88,17 @@ where
 impl<L, T> CircularArc<L, T>
 where
     L: LengthType,
-    T: Num,
+    T: Num + Float + FloatConst + FromPrimitive,
 {
-    pub fn new(
+    pub fn new<C: Into<Coordinate<Length<L, T>>>>(
         radius: Length<L, T>,
-        center: (Length<L, T>, Length<L, T>),
+        center: C,
         angle: (Angle<T>, Angle<T>),
         resolution: Resolution<Length<L, T>>,
     ) -> Self {
         Self {
-            inner: _Arc { radius },
-            center,
+            inner: _Arc::new(radius),
+            center: center.into(),
             angle,
             resolution,
         }
@@ -100,6 +109,18 @@ where
         resolution: Resolution<Length<L, T>>,
     ) -> Self {
         Self::new(radius, (Zero::zero(), Zero::zero()), angle, resolution)
+    }
+    pub fn set_radius(&mut self, radius: Length<L, T>) -> &mut Self {
+        self.inner = _Arc::new(radius);
+        self
+    }
+    pub fn set_ang(&mut self, angle: (Angle<T>, Angle<T>)) -> &mut Self {
+        self.angle = angle;
+        self
+    }
+    pub fn set_center<C: Into<Coordinate<Length<L, T>>>>(&mut self, center: C) -> &mut Self {
+        self.center = center.into();
+        self
     }
 }
 
@@ -113,7 +134,7 @@ where
     fn into_iter(self) -> Self::IntoIter {
         self.inner
             .to_points(self.angle, self.resolution)
-            .map(move |p| p + Vector2::from([self.center.0, self.center.1]))
+            .map(move |p| p + Vector2::from([self.center[0], self.center[1]]))
     }
 }
 
@@ -191,8 +212,8 @@ where
     L: LengthType,
     T: Num,
 {
-    pub(crate) start: LenCo<L, T>,
-    pub(crate) end: LenCo<L, T>,
+    pub start: LenCo<L, T>,
+    pub end: LenCo<L, T>,
 }
 
 impl<L, T> Line<L, T>

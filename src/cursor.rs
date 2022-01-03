@@ -1,14 +1,14 @@
-use nalgebra::RealField;
-use num::{traits::FloatConst, Float, FromPrimitive};
+use nalgebra::{RealField, Rotation, Translation};
+use num::{traits::FloatConst, Float, FromPrimitive, Zero};
 
 use crate::{
     draw::{
-        coordinate::{Coordinate, LenCo},
+        coordinate::{Coordinate, LenCo, MulAsScalar},
         curve::{
             groups::{Compound, Group},
             Area, Curve, Sweep,
         },
-        transfer::CommonTrans,
+        transfer::{CommonTrans, MulOpClosure, Transfer},
         CircularArc, Line,
     },
     units::{Absolute, Angle, Length, LengthType},
@@ -25,6 +25,15 @@ where
     dir: Angle<T>,
 }
 
+impl<L: LengthType, T: Num> Default for Cursor<L, T> {
+    fn default() -> Self {
+        Self {
+            pos: LenCo::from([Zero::zero(), Zero::zero()]),
+            dir: Angle::from_rad(Zero::zero()),
+        }
+    }
+}
+
 impl<L: LengthType, T: Num> Cursor<L, T> {
     pub fn new<C: Into<LenCo<L, T>>>(pos: C, dir: Angle<T>) -> Self {
         Self {
@@ -32,7 +41,8 @@ impl<L: LengthType, T: Num> Cursor<L, T> {
             dir,
         }
     }
-    pub fn assemble<E>(&mut self, e: E) -> Area<impl IntoIterator<Item = LenCo<L, T>>>
+    //WHAT THE FUCK
+    pub fn assemble<E>(&mut self, e: E) -> <<<E as Transfer<Length<L, T>>>::Output<MulOpClosure<MulAsScalar<Translation<T, 2_usize>>>> as Transfer<Length<L, T>>>::Output<MulOpClosure<MulAsScalar<Rotation<T, 2_usize>>>> as Transfer<Length<L, T>>>::Output<MulOpClosure<MulAsScalar<Translation<T, 2_usize>>>>
     where
         T: RealField + Float,
         E: CommonTrans<L, T> + Pos<Length<L, T>> + Dir<T>,
@@ -47,7 +57,7 @@ impl<L: LengthType, T: Num> Cursor<L, T> {
             .translate(self.pos[0], self.pos[1]);
         self.pos = self.pos + (end_pos - start_pos).rotate(self.dir - start_ang);
         self.dir = self.dir + end_ang - start_ang;
-        Area { area: e }
+        e
     }
 }
 
@@ -97,18 +107,20 @@ impl<Q: Num, A: Dir<Q>> Dir<Q> for Area<A> {
     }
 }
 
-impl<L: LengthType, T: Num + Float> Pos<Length<L, T>> for CircularArc<L, T> {
+impl<L: LengthType, T: Num + Float + FromPrimitive + FloatConst> Pos<Length<L, T>>
+    for CircularArc<L, T>
+{
     fn start_pos(&self) -> Coordinate<Length<L, T>> {
         (
-            self.inner.radius * self.angle.0.cos() + self.center.0,
-            self.inner.radius * self.angle.0.sin() + self.center.1,
+            self.inner.radius() * self.angle.0.cos() + self.center[0],
+            self.inner.radius() * self.angle.0.sin() + self.center[1],
         )
             .into()
     }
     fn end_pos(&self) -> Coordinate<Length<L, T>> {
         (
-            self.inner.radius * self.angle.1.to_rad().cos() + self.center.0,
-            self.inner.radius * self.angle.1.to_rad().sin() + self.center.1,
+            self.inner.radius() * self.angle.1.to_rad().cos() + self.center[0],
+            self.inner.radius() * self.angle.1.to_rad().sin() + self.center[1],
         )
             .into()
     }
@@ -221,13 +233,14 @@ where
     }
 }
 
-pub struct ArcCurve {
+#[derive(Clone, Copy, Debug)]
+pub struct ArcCurve<W: AsRef<[Length<Absolute, f64>]>> {
     arc: CircularArc,
-    width: Vec<Length<Absolute, f64>>,
+    width: W,
 }
 
-impl ArcCurve {
-    pub fn new(arc: CircularArc, width: Vec<Length<Absolute, f64>>) -> Self {
+impl<W: AsRef<[Length<Absolute, f64>]>> ArcCurve<W> {
+    pub fn new(arc: CircularArc, width: W) -> Self {
         Self { arc, width }
     }
     pub fn into_group(
@@ -239,14 +252,18 @@ impl ArcCurve {
     > {
         Group(
             self.width
+                .as_ref()
                 .into_iter()
-                .map(|x| LocatIter::locat_sweep(self.arc, (-x / 2., x / 2.)))
+                .map(|x| LocatIter::locat_sweep(self.arc, (-*x / 2., *x / 2.)))
                 .collect(),
         )
     }
+    pub fn arc_mut(&mut self) -> &mut CircularArc {
+        &mut self.arc
+    }
 }
 
-impl Pos<Length<Absolute, f64>> for ArcCurve {
+impl<W: AsRef<[Length<Absolute, f64>]>> Pos<Length<Absolute, f64>> for ArcCurve<W> {
     fn start_pos(&self) -> Coordinate<Length<Absolute, f64>> {
         self.arc.start_pos()
     }
@@ -255,7 +272,7 @@ impl Pos<Length<Absolute, f64>> for ArcCurve {
     }
 }
 
-impl Pos<Length<Absolute, f64>> for Rect {
+impl<W: AsRef<[Length<Absolute, f64>]>> Pos<Length<Absolute, f64>> for Rect<W> {
     fn start_pos(&self) -> Coordinate<Length<Absolute, f64>> {
         self.line.start_pos()
     }
@@ -264,7 +281,7 @@ impl Pos<Length<Absolute, f64>> for Rect {
     }
 }
 
-impl Dir<f64> for ArcCurve {
+impl<W: AsRef<[Length<Absolute, f64>]>> Dir<f64> for ArcCurve<W> {
     fn start_ang(&self) -> Angle<f64> {
         self.arc.start_ang()
     }
@@ -273,7 +290,7 @@ impl Dir<f64> for ArcCurve {
     }
 }
 
-impl Dir<f64> for Rect {
+impl<W: AsRef<[Length<Absolute, f64>]>> Dir<f64> for Rect<W> {
     fn start_ang(&self) -> Angle<f64> {
         self.line.start_ang()
     }
@@ -355,13 +372,15 @@ impl<Q: Quantity, A: Num, I: Iterator<Item = Coordinate<Q>>> Dir<A> for LocatIte
         self.ang.1.clone()
     }
 }
-pub struct Rect {
+
+#[derive(Clone, Copy, Debug)]
+pub struct Rect<W: AsRef<[Length<Absolute, f64>]>> {
     line: Line,
-    width: Vec<Length<Absolute, f64>>,
+    width: W,
 }
 
-impl Rect {
-    pub fn new(line: Line, width: Vec<Length<Absolute, f64>>) -> Self {
+impl<W: AsRef<[Length<Absolute, f64>]>> Rect<W> {
+    pub fn new(line: Line, width: W) -> Self {
         Self { line, width }
     }
     pub fn into_group(
@@ -373,10 +392,14 @@ impl Rect {
     > {
         Group(
             self.width
+                .as_ref()
                 .into_iter()
-                .map(|x| LocatIter::locat_sweep(self.line, (-x / 2., x / 2.)))
+                .map(|x| LocatIter::locat_sweep(self.line, (-*x / 2., *x / 2.)))
                 .collect(),
         )
+    }
+    pub fn line_mut(&mut self) -> &mut Line {
+        &mut self.line
     }
 }
 
@@ -393,7 +416,7 @@ mod tests {
         let mut c: Cursor = Cursor::new((zero(), zero()), Angle::from_deg(90f64));
         let rect = Rect::new(
             Line::new((MICROMETER, MICROMETER), (MICROMETER * 2., MICROMETER * 2.)),
-            [MICROMETER / 2.].into(),
+            [MICROMETER / 2.],
         );
         let rect: Vec<_> = c.assemble(rect.into_group()).into_iter().collect();
         assert!(c
@@ -420,7 +443,7 @@ mod tests {
                 (Angle::from_deg(30.), Angle::from_deg(60.)),
                 Resolution::MinDistance(NANOMETER * 20.),
             ),
-            [MICROMETER * 2., MICROMETER * 4.].into(),
+            [MICROMETER * 2., MICROMETER * 4.],
         );
         let _circ = c.assemble(circ.into_group());
         assert!(c.pos.approx_eq(

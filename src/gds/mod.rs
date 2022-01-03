@@ -5,7 +5,7 @@ use num::{FromPrimitive, ToPrimitive};
 use crate::{
     color::LayerData,
     draw::coordinate::Coordinate,
-    units::{Absolute, Length, LengthType, Relative},
+    units::{Absolute, AbsoluteLength, Length, LengthType, Relative},
     Num, Quantity,
 };
 
@@ -169,7 +169,7 @@ where
 }
 
 #[derive(Debug)]
-pub struct DgirCell<Q>
+pub struct DgirCell<Q = AbsoluteLength<f64>>
 where
     Q: Quantity,
 {

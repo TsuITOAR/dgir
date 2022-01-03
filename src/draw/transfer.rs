@@ -53,8 +53,7 @@ pub trait Transfer<Q>: Sized
 where
     Q: Quantity,
 {
-    type Output<F: FnMut(Coordinate<Q>) -> Coordinate<Q> + Clone>: Transfer<Q>
-        + IntoIterator<Item = Coordinate<Q>>;
+    type Output<F: FnMut(Coordinate<Q>) -> Coordinate<Q> + Clone>: Transfer<Q>;
     fn transfer<F: FnMut(Coordinate<Q>) -> Coordinate<Q> + Clone>(self, f: F) -> Self::Output<F>;
     fn matrix_trans<M: Clone>(self, m: M) -> Self::Output<MulOpClosure<M>>
     where

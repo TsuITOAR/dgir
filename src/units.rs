@@ -339,7 +339,7 @@ pub type AbsoluteLength<S> = Length<Absolute, S>;
 pub type RelativeLength<S> = Length<Relative, S>;
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord)]
-pub struct Angle<S>(S);
+pub struct Angle<S = f64>(S);
 impl<S> Angle<S> {
     pub fn to_rad(self) -> S {
         self.0
