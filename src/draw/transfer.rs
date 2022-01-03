@@ -153,7 +153,7 @@ mod tests {
     use float_cmp::ApproxEq;
 
     use crate::{
-        draw::{curve::IntoCurve, APROX_EQ_MARGIN},
+        draw::{curve::IntoCurve, APPROX_EQ_MARGIN},
         MILLIMETER,
     };
 
@@ -187,7 +187,7 @@ mod tests {
             .unwrap()
             .approx_eq(
                 Coordinate::from((MILLIMETER * -2., MILLIMETER)),
-                APROX_EQ_MARGIN
+                APPROX_EQ_MARGIN
             ),);
     }
 }

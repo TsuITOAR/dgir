@@ -5,6 +5,7 @@ use std::{
     ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign},
 };
 
+use float_cmp::ApproxEq;
 use num::{
     traits::{FloatConst, NumRef},
     Float, FromPrimitive, Num, Zero,
@@ -18,13 +19,19 @@ pub trait RelativeUnit {
     const CONVERSION_FACTOR: u32;
 }
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Clone, Copy, Default)]
 pub struct Length<T: LengthType, S> {
     pub(crate) value: S,
     pub(crate) marker: PhantomData<T>,
 }
 
 impl<T: LengthType, S: Display> Display for Length<T, S> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.value)
+    }
+}
+
+impl<T: LengthType, S: Display> Debug for Length<T, S> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.value)
     }
@@ -331,12 +338,6 @@ impl RelativeUnit for DbUnit {
 pub type AbsoluteLength<S> = Length<Absolute, S>;
 pub type RelativeLength<S> = Length<Relative, S>;
 
-#[derive(Debug, Clone, Copy, Default)]
-pub struct Deg<S>(S);
-
-#[derive(Debug, Clone, Copy, Default)]
-pub struct Rad<S>(S);
-
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord)]
 pub struct Angle<S>(S);
 impl<S> Angle<S> {
@@ -369,6 +370,13 @@ impl<S> Angle<S> {
         S: Float,
     {
         self.to_rad().sin()
+    }
+}
+
+impl<S: ApproxEq> ApproxEq for Angle<S> {
+    type Margin = S::Margin;
+    fn approx_eq<M: Into<Self::Margin>>(self, other: Self, margin: M) -> bool {
+        self.0.approx_eq(other.0, margin)
     }
 }
 

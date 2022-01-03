@@ -19,7 +19,7 @@ pub mod curve;
 pub(crate) mod transfer;
 
 #[cfg(test)]
-const APROX_EQ_MARGIN: (f64, i64) = (0., 1);
+pub(crate) const APPROX_EQ_MARGIN: (f64, i64) = (0.000000000001, 1);
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub enum Resolution<T = Length<Absolute, f64>> {
@@ -191,8 +191,8 @@ where
     L: LengthType,
     T: Num,
 {
-   pub(crate) start: LenCo<L, T>,
-   pub(crate) end: LenCo<L, T>,
+    pub(crate) start: LenCo<L, T>,
+    pub(crate) end: LenCo<L, T>,
 }
 
 impl<L, T> Line<L, T>
@@ -294,20 +294,20 @@ mod tests {
         line.bias(MILLIMETER * (2.).sqrt());
         assert!(line.start.approx_eq(
             LenCo::from((MILLIMETER * 0., MILLIMETER * 2.)),
-            APROX_EQ_MARGIN
+            APPROX_EQ_MARGIN
         ));
         assert!(line.end.approx_eq(
             LenCo::from((MILLIMETER * 1., MILLIMETER * 3.)),
-            APROX_EQ_MARGIN
+            APPROX_EQ_MARGIN
         ),);
         line.bias(MILLIMETER * (2.).sqrt() * (-2.));
         assert!(line.start.approx_eq(
             LenCo::from((MILLIMETER * 2., MILLIMETER * 0.)),
-            APROX_EQ_MARGIN
+            APPROX_EQ_MARGIN
         ));
         assert!(line.end.approx_eq(
             LenCo::from((MILLIMETER * 3., MILLIMETER * 1.)),
-            APROX_EQ_MARGIN
+            APPROX_EQ_MARGIN
         ),);
     }
     #[test]
@@ -317,33 +317,33 @@ mod tests {
             (MILLIMETER * 0., MILLIMETER * 2.),
         );
         let (lower, upper) = line.clone().split(MILLIMETER / 3.);
-        assert!(lower.start.approx_eq(line.start, APROX_EQ_MARGIN));
+        assert!(lower.start.approx_eq(line.start, APPROX_EQ_MARGIN));
 
         assert!(lower.end.approx_eq(
             LenCo::from((MILLIMETER * 0., MILLIMETER + MILLIMETER / 3.)),
-            APROX_EQ_MARGIN
+            APPROX_EQ_MARGIN
         ));
 
         assert!(upper.start.approx_eq(
             LenCo::from((MILLIMETER * 0., MILLIMETER + MILLIMETER / 3.)),
-            APROX_EQ_MARGIN
+            APPROX_EQ_MARGIN
         ));
 
-        assert!(upper.end.approx_eq(line.end, APROX_EQ_MARGIN));
+        assert!(upper.end.approx_eq(line.end, APPROX_EQ_MARGIN));
 
         let (lower, upper) = line.clone().split_half();
-        assert!(lower.start.approx_eq(line.start, APROX_EQ_MARGIN));
+        assert!(lower.start.approx_eq(line.start, APPROX_EQ_MARGIN));
 
         assert!(lower.end.approx_eq(
             LenCo::from((MILLIMETER * 0., MILLIMETER + MILLIMETER / 2.)),
-            APROX_EQ_MARGIN
+            APPROX_EQ_MARGIN
         ));
 
         assert!(upper.start.approx_eq(
             LenCo::from((MILLIMETER * 0., MILLIMETER + MILLIMETER / 2.)),
-            APROX_EQ_MARGIN
+            APPROX_EQ_MARGIN
         ));
 
-        assert!(upper.end.approx_eq(line.end, APROX_EQ_MARGIN));
+        assert!(upper.end.approx_eq(line.end, APPROX_EQ_MARGIN));
     }
 }

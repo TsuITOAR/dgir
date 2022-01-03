@@ -5,17 +5,34 @@ use std::{
 };
 
 use nalgebra::Point2;
+use num::Float;
 
 use crate::{
-    units::{Length, LengthType},
+    units::{Angle, Length, LengthType},
     Num, Quantity,
 };
 
 // #[cfg(algebra)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd)]
 pub struct Coordinate<Q: Quantity>(pub(crate) Point2<Q>);
 
+impl<Q: Quantity> Debug for Coordinate<Q> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Coordinate: [{:?},{:?}]", self[0], self[1])
+    }
+}
+
 pub(crate) type LenCo<L, T> = Coordinate<Length<L, T>>;
+
+impl<L: LengthType, T: Num + Float> LenCo<L, T> {
+    pub fn rotate(self, ang: Angle<T>) -> Self {
+        [
+            self.0[0] * ang.cos() - self.0[1] * ang.sin(),
+            self.0[0] * ang.sin() + self.0[1] * ang.cos(),
+        ]
+        .into()
+    }
+}
 
 impl<M, L, T> float_cmp::ApproxEq for LenCo<L, T>
 where

@@ -15,6 +15,7 @@ use crate::{
     Num, Quantity,
 };
 
+#[derive(Clone, Copy, Debug)]
 pub struct Cursor<L = Absolute, T = f64>
 where
     L: LengthType,
@@ -31,9 +32,9 @@ impl<L: LengthType, T: Num> Cursor<L, T> {
             dir,
         }
     }
-    pub fn assemble<E>(&mut self, e: E) -> impl IntoIterator<Item = LenCo<L, T>>
+    pub fn assemble<E>(&mut self, e: E) -> Area<impl IntoIterator<Item = LenCo<L, T>>>
     where
-        T: RealField,
+        T: RealField + Float,
         E: CommonTrans<L, T> + Pos<Length<L, T>> + Dir<T>,
     {
         let start_pos = e.start_pos();
@@ -44,9 +45,9 @@ impl<L: LengthType, T: Num> Cursor<L, T> {
             .translate(-start_pos[0], -start_pos[1])
             .rotate(self.dir - start_ang)
             .translate(self.pos[0], self.pos[1]);
-        self.pos = (self.pos + end_pos - start_pos).into();
+        self.pos = self.pos + (end_pos - start_pos).rotate(self.dir - start_ang);
         self.dir = self.dir + end_ang - start_ang;
-        e
+        Area { area: e }
     }
 }
 
@@ -99,8 +100,8 @@ impl<Q: Num, A: Dir<Q>> Dir<Q> for Area<A> {
 impl<L: LengthType, T: Num + Float> Pos<Length<L, T>> for CircularArc<L, T> {
     fn start_pos(&self) -> Coordinate<Length<L, T>> {
         (
-            self.inner.radius * self.angle.0.to_rad().cos() + self.center.0,
-            self.inner.radius * self.angle.0.to_rad().sin() + self.center.1,
+            self.inner.radius * self.angle.0.cos() + self.center.0,
+            self.inner.radius * self.angle.0.sin() + self.center.1,
         )
             .into()
     }
@@ -328,7 +329,7 @@ impl<Q: Quantity, A: Num, I: Iterator<Item = Coordinate<Q>> + DoubleEndedIterato
     {
         self.iter.rfind(predicate)
     }
-    fn rfold<B, F>(mut self, init: B, mut f: F) -> B
+    fn rfold<B, F>(self, init: B, f: F) -> B
     where
         Self: Sized,
         F: FnMut(B, Self::Item) -> B,
@@ -381,17 +382,54 @@ impl Rect {
 
 #[cfg(test)]
 mod tests {
-    use crate::{zero, MICROMETER};
-
     use super::*;
+    use crate::{
+        draw::{Resolution, APPROX_EQ_MARGIN},
+        zero, MICROMETER, NANOMETER,
+    };
+    use float_cmp::ApproxEq;
     #[test]
     fn apply_cursor() {
         let mut c: Cursor = Cursor::new((zero(), zero()), Angle::from_deg(90f64));
         let rect = Rect::new(
             Line::new((MICROMETER, MICROMETER), (MICROMETER * 2., MICROMETER * 2.)),
-            [MICROMETER / 4.].into(),
+            [MICROMETER / 2.].into(),
         );
-        let rect = c.assemble(rect.into_group());
-        
+        let rect: Vec<_> = c.assemble(rect.into_group()).into_iter().collect();
+        assert!(c
+            .pos
+            .approx_eq([zero(), MICROMETER * (2.).sqrt(),].into(), APPROX_EQ_MARGIN));
+        assert!(c.dir.approx_eq(Angle::from_deg(90f64), APPROX_EQ_MARGIN));
+        let expected: [Coordinate<_>; 4] = [
+            [MICROMETER / 4., zero()].into(),
+            [MICROMETER / 4., MICROMETER * (2.).sqrt()].into(),
+            [-MICROMETER / 4., MICROMETER * (2.).sqrt()].into(),
+            [-MICROMETER / 4., zero()].into(),
+        ];
+        assert!(rect
+            .iter()
+            .zip(expected.iter())
+            .all(|(l, r)| { l.approx_eq(*r, APPROX_EQ_MARGIN) },));
+
+        let radius = MICROMETER * 120.;
+
+        let circ = ArcCurve::new(
+            CircularArc::new(
+                radius,
+                (MICROMETER, MICROMETER),
+                (Angle::from_deg(30.), Angle::from_deg(60.)),
+                Resolution::MinDistance(NANOMETER * 20.),
+            ),
+            [MICROMETER * 2., MICROMETER * 4.].into(),
+        );
+        let _circ = c.assemble(circ.into_group());
+        assert!(c.pos.approx_eq(
+            LenCo::from([zero(), MICROMETER * (2.).sqrt()])
+                + LenCo::from([
+                    -radius * (1. - Angle::from_deg(30.).cos()),
+                    radius * Angle::from_deg(30.).sin()
+                ]),
+            APPROX_EQ_MARGIN
+        ))
     }
 }
