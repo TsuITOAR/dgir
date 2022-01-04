@@ -75,7 +75,7 @@ fn assemble_pulley() {
     #[allow(non_snake_case)]
     let PUL_RAD: AbsoluteLength<f64> = RADIUS + RING_WIDTH[0] / 2. + BUS_WIDTH[0] / 2. + GAP;
 
-    let mut cursor: Assembler<_> = Assembler::new("topcell", COLOR, BUS_WIDTH, RESOLUTION);
+    let mut cursor: Assembler<_, _> = Assembler::new("topcell", COLOR, BUS_WIDTH, RESOLUTION);
     cursor.mut_cell().push(
         ArcCurve::new(
             CircularArc::new_origin(

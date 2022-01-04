@@ -45,6 +45,17 @@ impl<L: LengthType, T: Num> Cursor<L, T> {
             dir,
         }
     }
+    pub fn with_cell<Cell: AsMut<DgirCell<Length<L, T>>>, C: Colour>(
+        self,
+        cell: Cell,
+        color: C,
+    ) -> CellCursor<Cell, C, L, T> {
+        CellCursor {
+            cell,
+            color,
+            cursor: self,
+        }
+    }
     //WHAT THE FUCK
     pub fn assemble<E>(&mut self, e: E) -> <<<E as Transfer<Length<L, T>>>::Output<MulOpClosure<MulAsScalar<Translation<T, 2_usize>>>> as Transfer<Length<L, T>>>::Output<MulOpClosure<MulAsScalar<Rotation<T, 2_usize>>>> as Transfer<Length<L, T>>>::Output<MulOpClosure<MulAsScalar<Translation<T, 2_usize>>>>
     where
@@ -66,13 +77,18 @@ impl<L: LengthType, T: Num> Cursor<L, T> {
 }
 
 #[derive(Debug)]
-pub struct CellCursor<C: Colour + Clone, L: LengthType = Absolute, T: Num = f64> {
+pub struct CellCursor<
+    Cell: AsMut<DgirCell<Length<L, T>>>,
+    C: Colour + Clone,
+    L: LengthType = Absolute,
+    T: Num = f64,
+> {
     pub cursor: Cursor<L, T>,
-    cell: DgirCell<Length<L, T>>,
+    cell: Cell,
     pub color: C,
 }
 
-impl<C: Colour, L: LengthType, T: Num> CellCursor<C, L, T> {
+impl<C: Colour, L: LengthType, T: Num> CellCursor<DgirCell<Length<L, T>>, C, L, T> {
     pub fn new<S: ToString>(cell_name: S, color: C) -> Self {
         Self {
             cursor: Cursor::default(),
@@ -80,17 +96,40 @@ impl<C: Colour, L: LengthType, T: Num> CellCursor<C, L, T> {
             color,
         }
     }
-    pub fn new_from_cell(cell: DgirCell<Length<L, T>>, color: C) -> Self {
+}
+
+impl<Cell: AsMut<DgirCell<Length<L, T>>>, C: Colour, L: LengthType, T: Num>
+    CellCursor<Cell, C, L, T>
+{
+    pub fn new_from_cell(cell: Cell, color: C) -> Self {
         Self {
             cursor: Cursor::default(),
             cell,
             color,
         }
     }
-    pub fn mut_cell(&mut self) -> &mut DgirCell<Length<L, T>> {
-        &mut self.cell
+    pub fn with_assembler<W: AsRef<[Length<L, T>]>>(
+        self,
+        width: W,
+        res: Resolution,
+    ) -> Assembler<Cell, W, L, T>
+    where
+        C: Into<Group<LayerData>>,
+    {
+        Assembler {
+            cell_cur: CellCursor {
+                cell: self.cell,
+                color: self.color.into(),
+                cursor: self.cursor,
+            },
+            res,
+            width,
+        }
     }
-    pub fn into_cell(self) -> DgirCell<Length<L, T>> {
+    pub fn mut_cell(&mut self) -> &mut DgirCell<Length<L, T>> {
+        self.cell.as_mut()
+    }
+    pub fn into_cell(self) -> Cell {
         self.cell
     }
     pub fn assemble_in<E>(&mut self, e: E) -> &mut Self
@@ -100,19 +139,25 @@ impl<C: Colour, L: LengthType, T: Num> CellCursor<C, L, T> {
         <<<E as Transfer<Length<L, T>>>::Output<MulOpClosure<MulAsScalar<Translation<T, 2_usize>>>> as Transfer<Length<L, T>>>::Output<MulOpClosure<MulAsScalar<Rotation<T, 2_usize>>>> as Transfer<Length<L, T>>>::Output<MulOpClosure<MulAsScalar<Translation<T, 2_usize>>>>:crate::color::Decorated<C,Quantity=Length<L,T>>,
     {
         self.cell
+            .as_mut()
             .push(self.color.clone().color(self.cursor.assemble(e)));
         self
     }
 }
 
 #[derive(Debug)]
-pub struct Assembler<W: AsRef<[Length<L, T>]>, L: LengthType = Absolute, T: Num = f64> {
-    pub cell_cur: CellCursor<Group<LayerData>, L, T>,
+pub struct Assembler<
+    Cell: AsMut<DgirCell<Length<L, T>>>,
+    W: AsRef<[Length<L, T>]>,
+    L: LengthType = Absolute,
+    T: Num = f64,
+> {
+    pub cell_cur: CellCursor<Cell, Group<LayerData>, L, T>,
     pub width: W,
     pub res: Resolution,
 }
 
-impl<W: AsRef<[Length<L, T>]>, L: LengthType, T: Num> Assembler<W, L, T> {
+impl<W: AsRef<[Length<L, T>]>, L: LengthType, T: Num> Assembler<DgirCell<Length<L, T>>, W, L, T> {
     pub fn new<S: ToString, C: Into<Group<LayerData>>>(
         cell_name: S,
         color: C,
@@ -129,12 +174,11 @@ impl<W: AsRef<[Length<L, T>]>, L: LengthType, T: Num> Assembler<W, L, T> {
             res,
         }
     }
-    pub fn new_from_cell(
-        cell: DgirCell<Length<L, T>>,
-        color: Group<LayerData>,
-        width: W,
-        res: Resolution,
-    ) -> Self {
+}
+impl<Cell: AsMut<DgirCell<Length<L, T>>>, W: AsRef<[Length<L, T>]>, L: LengthType, T: Num>
+    Assembler<Cell, W, L, T>
+{
+    pub fn new_from_cell(cell: Cell, color: Group<LayerData>, width: W, res: Resolution) -> Self {
         Self {
             cell_cur: CellCursor {
                 cursor: Cursor::default(),
@@ -148,7 +192,7 @@ impl<W: AsRef<[Length<L, T>]>, L: LengthType, T: Num> Assembler<W, L, T> {
     pub fn mut_cell(&mut self) -> &mut DgirCell<Length<L, T>> {
         self.cell_cur.mut_cell()
     }
-    pub fn into_cell(self) -> DgirCell<Length<L, T>> {
+    pub fn into_cell(self) -> Cell {
         self.cell_cur.cell
     }
     pub fn set_pos<P: Into<Coordinate<Length<L, T>>>>(&mut self, p: P) -> &mut Self {
@@ -160,7 +204,11 @@ impl<W: AsRef<[Length<L, T>]>, L: LengthType, T: Num> Assembler<W, L, T> {
         self
     }
 }
-impl<W: 'static + Clone + AsRef<[Length<Absolute, f64>]>> Assembler<W, Absolute, f64> {
+impl<
+        Cell: AsMut<DgirCell<Length<Absolute, f64>>>,
+        W: 'static + Clone + AsRef<[Length<Absolute, f64>]>,
+    > Assembler<Cell, W, Absolute, f64>
+{
     pub fn turn(&mut self, radius: Length<Absolute, f64>, a: Angle<f64>) -> &mut Self {
         self.cell_cur.assemble_in(
             ArcCurve::new(
@@ -200,6 +248,7 @@ impl<W: 'static + Clone + AsRef<[Length<Absolute, f64>]>> Assembler<W, Absolute,
         );
         self.cell_cur
             .cell
+            .as_mut()
             .push(g.color(self.cell_cur.color.clone()));
         self.cell_cur.cursor.pos = self.cell_cur.cursor.pos
             + Coordinate::from([len, zero()]).rotate(self.cell_cur.cursor.dir);

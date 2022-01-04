@@ -50,7 +50,7 @@ where
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Ref<Q>
 where
     Q: Quantity,
@@ -175,6 +175,12 @@ where
 {
     pub name: String,
     pub(crate) elements: Vec<Element<Q>>,
+}
+
+impl<Q: Quantity> AsMut<DgirCell<Q>> for DgirCell<Q> {
+    fn as_mut(&mut self) -> &mut DgirCell<Q> {
+        self
+    }
 }
 
 impl<Q> DgirCell<Q>

@@ -116,7 +116,7 @@ fn cell_cursor() {
     #[allow(non_snake_case)]
     let RESOLUTION: Resolution = Resolution::MinDistance(20. * NANOMETER);
 
-    let mut cur: CellCursor<_> = CellCursor::new("topcell", Group::from(COLOR));
+    let mut cur: CellCursor<_, _> = CellCursor::new("topcell", Group::from(COLOR));
     let mut cir: ArcCurve<[_; 2]> = ArcCurve::new(
         CircularArc::new(
             MICROMETER * 240.,
@@ -152,7 +152,7 @@ fn assembler() {
     #[allow(non_snake_case)]
     let RESOLUTION: Resolution = Resolution::MinDistance(20. * NANOMETER);
 
-    let mut cur: Assembler<_> = Assembler::new("topcell", Group::from(COLOR), WIDTH, RESOLUTION);
+    let mut cur: Assembler<_, _> = Assembler::new("topcell", Group::from(COLOR), WIDTH, RESOLUTION);
     cur.turn(MICROMETER * 240., Angle::from_deg(120.));
     cur.extend(MICROMETER * 120.);
     cur.turn(MICROMETER * 200., Angle::from_deg(120.));
