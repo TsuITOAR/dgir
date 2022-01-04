@@ -8,7 +8,7 @@ use std::{
 use float_cmp::ApproxEq;
 use num::{
     traits::{FloatConst, NumRef},
-    Float, FromPrimitive, Num, Zero,
+    Float, FromPrimitive, Num, Signed, Zero,
 };
 
 pub trait AbsoluteUnit {
@@ -23,6 +23,15 @@ pub trait RelativeUnit {
 pub struct Length<T: LengthType, S> {
     pub(crate) value: S,
     pub(crate) marker: PhantomData<T>,
+}
+
+impl<T: LengthType, S: Signed> Length<T, S> {
+    pub fn abs(self) -> Self {
+        Self {
+            value: self.value.abs(),
+            marker: PhantomData,
+        }
+    }
 }
 
 impl<T: LengthType, S: Display> Display for Length<T, S> {

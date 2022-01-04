@@ -92,7 +92,7 @@ fn points_num_check(points: &Vec<GdsPoint>) -> bool {
 }
 
 fn close_curve(points: &mut Vec<GdsPoint>) -> bool {
-    if points.len() >= 2 && points.first() == points.last() {
+    if points.len() >= 2 && points.first() != points.last() {
         warn!(
             "curve not closed, start at ({}, {}), end at ({}, {})",
             points.first().unwrap().x,
