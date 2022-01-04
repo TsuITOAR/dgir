@@ -18,6 +18,7 @@ mod common;
 
 #[test]
 fn compound() {
+    common::init();
     let mut lib = DgirLibrary::new("libname");
     let cir = CircularArc::new(
         100. * MICROMETER,
@@ -44,6 +45,7 @@ fn compound() {
 
 #[test]
 fn cursor() {
+    common::init();
     #[allow(non_snake_case)]
     let WIDTH: [AbsoluteLength<f64>; 2] = [MICROMETER * 4., MICROMETER * 10.];
 
@@ -107,6 +109,7 @@ fn cursor() {
 
 #[test]
 fn cell_cursor() {
+    common::init();
     #[allow(non_snake_case)]
     let WIDTH: [AbsoluteLength<f64>; 2] = [MICROMETER * 4., MICROMETER * 10.];
 
@@ -143,6 +146,7 @@ fn cell_cursor() {
 
 #[test]
 fn assembler() {
+    common::init();
     #[allow(non_snake_case)]
     let WIDTH: [AbsoluteLength<f64>; 2] = [MICROMETER * 4., MICROMETER * 10.];
 

@@ -2,7 +2,7 @@ use std::iter::{Fuse, FusedIterator, Rev};
 
 use crate::{
     color::LayerData,
-    draw::{coordinate::Coordinate},
+    draw::coordinate::Coordinate,
     gds::{Element, Path, Polygon},
     Quantity,
 };
@@ -69,6 +69,16 @@ pub struct Close<T: Quantity, C: FusedIterator<Item = Coordinate<T>>> {
     curve: C,
     first: Option<C::Item>,
     current: Option<C::Item>,
+}
+
+impl<T: Quantity, C: FusedIterator<Item = Coordinate<T>>> Close<T, C> {
+    pub fn new(iter: C) -> Self {
+        Self {
+            curve: iter,
+            first: None,
+            current: None,
+        }
+    }
 }
 
 impl<T: Quantity, C: FusedIterator<Item = Coordinate<T>>> Iterator for Close<T, C> {

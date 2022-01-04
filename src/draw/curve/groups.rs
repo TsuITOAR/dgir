@@ -1,6 +1,8 @@
+use std::iter::{Flatten, Fuse};
+
 use crate::{draw::coordinate::Coordinate, Quantity};
 
-use super::Area;
+use super::{iter::Close, Area};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Compound<T1, T2>(pub(crate) T1, pub(crate) T2);
@@ -73,10 +75,10 @@ where
     T1: IntoIterator<Item = Coordinate<Q>>,
     T2: IntoIterator<Item = Coordinate<Q>>,
 {
-    type IntoIter = std::iter::Chain<T1::IntoIter, T2::IntoIter>;
+    type IntoIter = Close<Q, Fuse<std::iter::Chain<T1::IntoIter, T2::IntoIter>>>;
     type Item = Coordinate<Q>;
     fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter().chain(self.1.into_iter())
+        Close::new(self.0.into_iter().chain(self.1.into_iter()).fuse())
     }
 }
 
@@ -85,10 +87,10 @@ where
     Q: Quantity,
     T: IntoIterator<Item = Coordinate<Q>>,
 {
-    type IntoIter = std::iter::Flatten<<Vec<T> as IntoIterator>::IntoIter>;
+    type IntoIter = Close<Q, Fuse<Flatten<<Vec<T> as IntoIterator>::IntoIter>>>;
     type Item = Coordinate<Q>;
     fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter().flatten()
+        Close::new(self.0.into_iter().flatten().fuse())
     }
 }
 

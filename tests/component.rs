@@ -10,6 +10,7 @@ mod common;
 
 #[test]
 fn pulley() {
+    common::init();
     #[allow(non_snake_case)]
     let RING_WIDTH: [AbsoluteLength<f64>; 2] = [MICROMETER * 4., MICROMETER * 10.];
     #[allow(non_snake_case)]
@@ -58,6 +59,7 @@ fn pulley() {
 
 #[test]
 fn assemble_pulley() {
+    common::init();
     #[allow(non_snake_case)]
     let RING_WIDTH: [AbsoluteLength<f64>; 2] = [MICROMETER * 4., MICROMETER * 10.];
     #[allow(non_snake_case)]
