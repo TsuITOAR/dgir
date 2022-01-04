@@ -1,11 +1,12 @@
 use std::{collections::BTreeSet, fmt::Debug, rc::Rc};
 
-use num::{FromPrimitive, ToPrimitive};
+use gds21::GdsStrans;
+use num::{traits::FloatConst, FromPrimitive, ToPrimitive};
 
 use crate::{
     color::LayerData,
     draw::coordinate::Coordinate,
-    units::{Absolute, AbsoluteLength, Length, LengthType, Relative},
+    units::{Absolute, AbsoluteLength, Angle, Length, LengthType, Relative},
     Num, Quantity,
 };
 
@@ -59,6 +60,25 @@ where
     pub(crate) pos: Coordinate<Q>,
     pub(crate) id: String,
     pub(crate) dep: BTreeSet<Rc<DgirCell<Q>>>, //TODO need to avoid circular ref, or dead loop happens
+}
+
+impl<Q: Quantity> Ref<Q> {
+    pub fn set_pos<C: Into<Coordinate<Q>>>(&mut self, c: C) -> &mut Self {
+        self.pos = c.into();
+        self
+    }
+    pub fn set_rot<T: Num + FloatConst + FromPrimitive>(&mut self, ang: Angle<T>) -> &mut Self {
+        if let Some(ref mut s) = self.strans {
+            s.angle = ang.to_deg().to_f64().unwrap().into();
+        } else {
+            self.strans = GdsStrans {
+                angle: ang.to_deg().to_f64().unwrap().into(),
+                ..Default::default()
+            }
+            .into()
+        }
+        self
+    }
 }
 
 #[derive(Debug)]
@@ -207,11 +227,14 @@ where
 
     pub fn into_ref(self) -> Ref<Q> {
         let mut s = self;
+        let name = s.name.clone();
+        let mut dep = s.get_dependencies();
+        dep.insert(Rc::new(s));
         Ref {
             strans: None,
-            dep: s.get_dependencies(),
+            dep,
             pos: Coordinate::from([Q::zero(), Q::zero()]),
-            id: s.name,
+            id: name,
         }
     }
     //make sure every sub dependencies is empty
