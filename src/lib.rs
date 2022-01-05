@@ -11,6 +11,8 @@ use std::{
 };
 use units::{AbsoluteLength, Length, LengthType};
 
+pub use num;
+
 pub mod color;
 pub mod cursor;
 pub mod draw;

@@ -32,6 +32,18 @@ impl<T: LengthType, S: Signed> Length<T, S> {
             marker: PhantomData,
         }
     }
+    pub fn is_negative(self) -> bool {
+        self.value.is_negative()
+    }
+    pub fn is_positive(self) -> bool {
+        self.value.is_positive()
+    }
+    pub fn abs_sub(&self, other: &Self) -> Self {
+        Self {
+            value: self.value.abs_sub(&other.value),
+            marker: PhantomData,
+        }
+    }
 }
 
 impl<T: LengthType, S: Display> Display for Length<T, S> {

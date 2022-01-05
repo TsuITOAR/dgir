@@ -37,6 +37,7 @@ pub trait Colour: Sized + Clone {
 }
 
 impl Colour for LayerData {}
+impl Colour for (i16, i16) {}
 impl<T1: Colour, T2: Colour> Colour for Compound<T1, T2> {}
 impl<T: Colour> Colour for Group<T> {}
 impl<T: Colour, const LEN: usize> Colour for [T; LEN] {}
@@ -65,6 +66,16 @@ where
     type Quantity = Q;
     fn color(self, c: LayerData) -> ElementsGroup<Self::Quantity> {
         ElementsGroup::Single(self.to_path(c))
+    }
+}
+
+impl<T> Decorated<(i16, i16)> for T
+where
+    T: Decorated<LayerData>,
+{
+    type Quantity = T::Quantity;
+    fn color(self, c: (i16, i16)) -> ElementsGroup<Self::Quantity> {
+        self.color(LayerData::new(c.0, c.1))
     }
 }
 
