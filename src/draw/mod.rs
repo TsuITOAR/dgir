@@ -125,6 +125,12 @@ where
     pub fn length(&self) -> Length<L, T> {
         self.inner.radius * self.angle.0.to_rad().abs_sub(self.angle.1.to_rad())
     }
+    pub fn radius(&self) -> Length<L, T> {
+        self.inner.radius
+    }
+    pub fn angle(&self) -> (Angle<T>, Angle<T>) {
+        self.angle
+    }
 }
 
 impl<L, T> IntoIterator for CircularArc<L, T>
