@@ -5,7 +5,7 @@ use crate::{draw::coordinate::Coordinate, Quantity};
 use super::{iter::Close, Area};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Compound<T1, T2>(pub(crate) T1, pub(crate) T2);
+pub struct Compound<T1, T2>(pub T1, pub T2);
 
 impl<Q, T1, T2> Compound<T1, T2>
 where
@@ -26,7 +26,7 @@ where
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Group<T>(pub(crate) Vec<T>);
+pub struct Group<T>(pub Vec<T>);
 
 impl<Q, T> Group<T>
 where

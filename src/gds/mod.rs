@@ -79,7 +79,7 @@ impl<Q: Quantity> Ref<Q> {
         }
         self
     }
-    pub fn to_array_ref(
+    pub fn into_array_ref(
         &self,
         start: impl Into<Coordinate<Q>>,
         rows: i16,

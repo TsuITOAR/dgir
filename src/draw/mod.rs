@@ -29,7 +29,7 @@ pub enum Resolution<T = Length<Absolute, f64>> {
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct _Arc<S> {
-    radius: S,
+    pub(crate) radius: S,
 }
 
 impl<L, T> _Arc<Length<L, T>>
@@ -121,6 +121,9 @@ where
     pub fn set_center<C: Into<Coordinate<Length<L, T>>>>(&mut self, center: C) -> &mut Self {
         self.center = center.into();
         self
+    }
+    pub fn length(&self) -> Length<L, T> {
+        self.inner.radius * self.angle.0.to_rad().abs_sub(self.angle.1.to_rad())
     }
 }
 
