@@ -4,7 +4,7 @@ use std::{ops::Index, rc::Rc};
 
 use crate::{
     close_curve,
-    draw::coordinate::LenCo,
+    draw::coordinate::{Coordinate, LenCo},
     gds::Element,
     points_num_check, split_path, split_polygon,
     units::{Absolute, Length, Relative},
@@ -80,6 +80,16 @@ where
     type Scale = Length<Absolute, T>;
     fn to_gds21_struct(self, scale: Self::Scale) -> gds21::GdsStruct {
         use gds21::*;
+        fn to_gds_point<T: ToPrimitive + Num>(
+            f: Coordinate<Length<Absolute, T>>,
+            scale: Length<Absolute, T>,
+        ) -> Gds21Point {
+            Gds21Point::new(
+                (f[0] / scale).to_i32().unwrap(),
+                (f[1] / scale).to_i32().unwrap(),
+            )
+        }
+
         let mut new_cell = GdsStruct::new(self.name);
         for elem in self.elements {
             match elem {
@@ -144,11 +154,20 @@ where
                 }
                 Element::Ref(r) => new_cell.elems.push(GdsElement::GdsStructRef(GdsStructRef {
                     name: r.id,
-                    xy: Gds21Point::new(
-                        (r.pos[0] / scale).to_i32().unwrap(),
-                        (r.pos[1] / scale).to_i32().unwrap(),
-                    ),
+                    xy: to_gds_point(r.pos, scale),
                     strans: r.strans,
+                    ..Default::default()
+                })),
+                Element::ARef(ar) => new_cell.elems.push(GdsElement::GdsArrayRef(GdsArrayRef {
+                    name: ar.id,
+                    xy: [
+                        to_gds_point(ar.start, scale),
+                        to_gds_point(ar.col_end, scale),
+                        to_gds_point(ar.row_end, scale),
+                    ],
+                    cols: ar.rows,
+                    rows: ar.cols,
+                    strans: ar.strans,
                     ..Default::default()
                 })),
             }
@@ -164,6 +183,16 @@ where
     type Scale = ();
     fn to_gds21_struct(self, scale: Self::Scale) -> gds21::GdsStruct {
         use gds21::*;
+        fn to_gds_point<T: ToPrimitive + Num>(
+            f: Coordinate<Length<Relative, T>>,
+            _scale: (),
+        ) -> Gds21Point {
+            Gds21Point::new(
+                (f[0].value).to_i32().unwrap(),
+                (f[1].value).to_i32().unwrap(),
+            )
+        }
+
         let mut new_cell = GdsStruct::new(self.name);
         for elem in self.elements {
             match elem {
@@ -228,11 +257,20 @@ where
                 }
                 Element::Ref(r) => new_cell.elems.push(GdsElement::GdsStructRef(GdsStructRef {
                     name: r.id,
-                    xy: Gds21Point::new(
-                        r.pos[0].value.to_i32().unwrap(),
-                        r.pos[1].value.to_i32().unwrap(),
-                    ),
+                    xy: to_gds_point(r.pos, scale),
                     strans: r.strans,
+                    ..Default::default()
+                })),
+                Element::ARef(ar) => new_cell.elems.push(GdsElement::GdsArrayRef(GdsArrayRef {
+                    name: ar.id,
+                    xy: [
+                        to_gds_point(ar.start, scale),
+                        to_gds_point(ar.col_end, scale),
+                        to_gds_point(ar.row_end, scale),
+                    ],
+                    cols: ar.rows,
+                    rows: ar.cols,
+                    strans: ar.strans,
                     ..Default::default()
                 })),
             }

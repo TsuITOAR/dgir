@@ -11,7 +11,7 @@ use dgir::{
     },
     gds::{DgirCell, DgirLibrary},
     units::{AbsoluteLength, Angle},
-    zero, MICROMETER, NANOMETER,
+    zero, MICROMETER, MILLIMETER, NANOMETER,
 };
 
 mod common;
@@ -165,5 +165,36 @@ fn assembler() {
     cur.turn(MICROMETER * 200., Angle::from_deg(120.));
     cur.into_cell()
         .save_as_lib(common::get_file_path("assembler.gds"))
+        .unwrap();
+}
+
+#[test]
+fn array_ref() {
+    common::init();
+    let c = Compound::from((
+        Rect::new(
+            Line::new([-MICROMETER * 10., zero()], [MICROMETER * 10., zero()]),
+            [MICROMETER * 5.],
+        )
+        .into_group(),
+        Rect::new(
+            Line::new([zero(), -MICROMETER * 10.], [zero(), MICROMETER * 10.]),
+            [MICROMETER * 5.],
+        )
+        .into_group(),
+    ));
+    let s = c.color(Compound::from(((1, 0), (2, 0))));
+    let mut cell = DgirCell::new("array_ref");
+    cell.push(s);
+    let mut top_cell = DgirCell::new("top_cell");
+    top_cell.push(cell.into_array_ref(
+        [zero(), zero()],
+        2,
+        [100. * 2. * MICROMETER, zero() * 2.],
+        2,
+        [50. * 2. * MICROMETER, MILLIMETER * 2.],
+    ));
+    top_cell
+        .save_as_lib(common::get_file_path("array_ref.gds"))
         .unwrap();
 }

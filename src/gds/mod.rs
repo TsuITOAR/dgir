@@ -79,6 +79,67 @@ impl<Q: Quantity> Ref<Q> {
         }
         self
     }
+    pub fn to_array_ref(
+        &self,
+        start: impl Into<Coordinate<Q>>,
+        rows: i16,
+        row_end: impl Into<Coordinate<Q>>,
+        cols: i16,
+        col_end: impl Into<Coordinate<Q>>,
+    ) -> ArrayRef<Q> {
+        ArrayRef {
+            strans: self.strans.clone(),
+            rows,
+            cols,
+            start: start.into(),
+            col_end: col_end.into(),
+            row_end: row_end.into(),
+            id: self.id.clone(),
+            dep: self.dep.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ArrayRef<Q>
+where
+    Q: Quantity,
+{
+    pub(crate) strans: Option<gds21::GdsStrans>,
+    pub(crate) rows: i16,
+    pub(crate) cols: i16,
+    pub(crate) start: Coordinate<Q>,
+    pub(crate) col_end: Coordinate<Q>,
+    pub(crate) row_end: Coordinate<Q>,
+    pub(crate) id: String,
+    pub(crate) dep: BTreeSet<Rc<DgirCell<Q>>>, //TODO need to avoid circular ref, or dead loop happens
+}
+
+impl<Q: Quantity> ArrayRef<Q> {
+    pub fn set_start<C: Into<Coordinate<Q>>>(&mut self, c: C) -> &mut Self {
+        self.start = c.into();
+        self
+    }
+    pub fn set_col_end<C: Into<Coordinate<Q>>>(&mut self, c: C) -> &mut Self {
+        self.col_end = c.into();
+        self
+    }
+    pub fn set_row_end<C: Into<Coordinate<Q>>>(&mut self, c: C) -> &mut Self {
+        self.row_end = c.into();
+        self
+    }
+    pub fn set_rot<T: Num + FloatConst + FromPrimitive>(&mut self, ang: Angle<T>) -> &mut Self {
+        if let Some(ref mut s) = self.strans {
+            s.angle = ang.to_deg().to_f64().unwrap().into();
+        } else {
+            self.strans = GdsStrans {
+                angle: ang.to_deg().to_f64().unwrap().into(),
+                ..Default::default()
+            }
+            .into()
+        }
+        self
+    }
 }
 
 #[derive(Debug)]
@@ -89,6 +150,7 @@ where
     Path(Path<Q>),
     Polygon(Polygon<Q>),
     Ref(Ref<Q>),
+    ARef(ArrayRef<Q>),
 }
 
 impl<Q> Element<Q>
@@ -187,7 +249,50 @@ where
         Element::Ref(r)
     }
 }
+impl<Q> From<ArrayRef<Q>> for Element<Q>
+where
+    Q: Quantity,
+{
+    fn from(r: ArrayRef<Q>) -> Self {
+        Element::ARef(r)
+    }
+}
 
+impl<Q> From<Path<Q>> for ElementsGroup<Q>
+where
+    Q: Quantity,
+{
+    fn from(p: Path<Q>) -> Self {
+        Element::Path(p).into()
+    }
+}
+
+impl<Q> From<Polygon<Q>> for ElementsGroup<Q>
+where
+    Q: Quantity,
+{
+    fn from(p: Polygon<Q>) -> Self {
+        Element::Polygon(p).into()
+    }
+}
+
+impl<Q> From<Ref<Q>> for ElementsGroup<Q>
+where
+    Q: Quantity,
+{
+    fn from(r: Ref<Q>) -> Self {
+        Element::Ref(r).into()
+    }
+}
+
+impl<Q> From<ArrayRef<Q>> for ElementsGroup<Q>
+where
+    Q: Quantity,
+{
+    fn from(r: ArrayRef<Q>) -> Self {
+        Element::ARef(r).into()
+    }
+}
 #[derive(Debug)]
 pub struct DgirCell<Q = AbsoluteLength<f64>>
 where
@@ -237,12 +342,51 @@ where
             id: name,
         }
     }
+    pub fn into_ref_at(self, pos: impl Into<Coordinate<Q>>) -> Ref<Q> {
+        let mut s = self;
+        let name = s.name.clone();
+        let mut dep = s.get_dependencies();
+        dep.insert(Rc::new(s));
+        Ref {
+            strans: None,
+            dep,
+            pos: pos.into(),
+            id: name,
+        }
+    }
+    pub fn into_array_ref(
+        self,
+        start: impl Into<Coordinate<Q>>,
+        rows: i16,
+        row_end: impl Into<Coordinate<Q>>,
+        cols: i16,
+        col_end: impl Into<Coordinate<Q>>,
+    ) -> ArrayRef<Q> {
+        let mut s = self;
+        let mut dep = s.get_dependencies();
+        let name = s.name.clone();
+        dep.insert(Rc::new(s));
+        ArrayRef {
+            rows,
+            cols,
+            start: start.into(),
+            col_end: col_end.into(),
+            row_end: row_end.into(),
+            id: name,
+            dep,
+            strans: None,
+        }
+    }
     //make sure every sub dependencies is empty
     pub(crate) fn get_dependencies(&mut self) -> BTreeSet<Rc<DgirCell<Q>>> {
         let mut dependencies = BTreeSet::new();
         for element in self.elements.iter_mut() {
             match element {
                 Element::Ref(Ref { dep: ref mut d, .. }) => {
+                    debug_assert!(is_sub_dependencies_empty(d));
+                    dependencies.append(d);
+                }
+                Element::ARef(ArrayRef { dep: ref mut d, .. }) => {
                     debug_assert!(is_sub_dependencies_empty(d));
                     dependencies.append(d);
                 }
