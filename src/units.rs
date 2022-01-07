@@ -45,6 +45,22 @@ impl<T: LengthType, S: Signed> Length<T, S> {
         }
     }
 }
+impl<T: LengthType, S: PartialOrd> Length<T, S> {
+    pub fn max<'a>(&'a self, other: &'a Self) -> &'a Self {
+        if self.value > other.value {
+            self
+        } else {
+            other
+        }
+    }
+    pub fn min<'a>(&'a self, other: &'a Self) -> &'a Self {
+        if self.value < other.value {
+            self
+        } else {
+            other
+        }
+    }
+}
 
 impl<T: LengthType, S: Display> Display for Length<T, S> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
