@@ -123,7 +123,7 @@ where
         self
     }
     pub fn length(&self) -> Length<L, T> {
-        self.inner.radius * self.angle.0.to_rad().abs_sub(self.angle.1.to_rad())
+        self.inner.radius * (self.angle.0.to_rad() - self.angle.1.to_rad()).abs()
     }
     pub fn radius(&self) -> Length<L, T> {
         self.inner.radius
