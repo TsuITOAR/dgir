@@ -142,6 +142,36 @@ impl<Q: Quantity> ArrayRef<Q> {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct Text<Q: Quantity> {
+    pub(crate) content: String,
+    pub(crate) strans: Option<gds21::GdsStrans>,
+    pub(crate) pos: Coordinate<Q>,
+    pub(crate) width: Option<Q>,
+    pub layer: i16,
+    pub path_type: Option<i16>,
+    pub texttype: i16,
+}
+
+impl<Q: Quantity> Text<Q> {
+    pub fn new(
+        content: String,
+        pos: impl Into<Coordinate<Q>>,
+        layer: i16,
+        width: impl Into<Option<Q>>,
+    ) -> Self {
+        Self {
+            content,
+            pos: pos.into(),
+            width: width.into(),
+            layer,
+            strans: None,
+            path_type: None,
+            texttype: 1,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub enum Element<Q>
 where
@@ -151,6 +181,7 @@ where
     Polygon(Polygon<Q>),
     Ref(Ref<Q>),
     ARef(ArrayRef<Q>),
+    Text(Text<Q>),
 }
 
 impl<Q> Element<Q>
@@ -258,6 +289,15 @@ where
     }
 }
 
+impl<Q> From<Text<Q>> for Element<Q>
+where
+    Q: Quantity,
+{
+    fn from(r: Text<Q>) -> Self {
+        Element::Text(r)
+    }
+}
+
 impl<Q> From<Path<Q>> for ElementsGroup<Q>
 where
     Q: Quantity,
@@ -293,6 +333,16 @@ where
         Element::ARef(r).into()
     }
 }
+
+impl<Q> From<Text<Q>> for ElementsGroup<Q>
+where
+    Q: Quantity,
+{
+    fn from(r: Text<Q>) -> Self {
+        Element::Text(r).into()
+    }
+}
+
 #[derive(Debug)]
 pub struct DgirCell<Q = AbsoluteLength<f64>>
 where

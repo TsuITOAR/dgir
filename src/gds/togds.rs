@@ -170,6 +170,16 @@ where
                     strans: ar.strans,
                     ..Default::default()
                 })),
+                Element::Text(t) => new_cell.elems.push(GdsElement::GdsTextElem(GdsTextElem {
+                    string: t.content,
+                    layer: t.layer,
+                    xy: to_gds_point(t.pos, scale),
+                    width: t.width.map(|x| (x / scale).to_i32().unwrap()),
+                    strans: t.strans,
+                    path_type: t.path_type,
+                    texttype: t.texttype,
+                    ..Default::default()
+                })),
             }
         }
         new_cell
@@ -271,6 +281,16 @@ where
                     cols: ar.rows,
                     rows: ar.cols,
                     strans: ar.strans,
+                    ..Default::default()
+                })),
+                Element::Text(t) => new_cell.elems.push(GdsElement::GdsTextElem(GdsTextElem {
+                    string: t.content,
+                    layer: t.layer,
+                    xy: to_gds_point(t.pos, scale),
+                    width: t.width.map(|x| x.value.to_i32().unwrap()),
+                    strans: t.strans,
+                    path_type: t.path_type,
+                    texttype: t.texttype,
                     ..Default::default()
                 })),
             }
