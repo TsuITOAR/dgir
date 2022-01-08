@@ -51,8 +51,11 @@ where
         angle: (Angle<T>, Angle<T>),
         resolution: Resolution<Length<L, T>>,
     ) -> Map<std::ops::RangeInclusive<usize>, impl FnMut(usize) -> LenCo<L, T>> {
+        if self.radius().is_negative() {
+            warn!("an arc with negative radius {} is drawing", self.radius());
+        }
         let ang_range = (angle.1 - angle.0).to_rad();
-        let section_num = match resolution {
+        let mut section_num = match resolution {
             Resolution::MinNumber(n) => {
                 debug_assert!(n > 1);
                 n - 1
@@ -61,6 +64,9 @@ where
                 .to_usize()
                 .unwrap(),
         };
+        if section_num < 1 {
+            section_num = 1;
+        }
         let ang_at = move |s: usize| {
             debug_assert!(s <= section_num);
             ang_range / FromPrimitive::from_usize(section_num).unwrap()

@@ -220,6 +220,7 @@ impl<
         self
     }
     pub fn extend(&mut self, len: Length<Absolute, f64>) -> &mut Self {
+        assert!(len.is_positive());
         self.cell_cur
             .assemble_in(Rect::from_length(len, self.width.clone()).into_group());
         self
